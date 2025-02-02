@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      0.6
+// @version      0.7
 // @description  把動畫瘋內容片段轉成GIF
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -508,7 +508,7 @@
     function handleTimeChange(e) {
 
         let startTime = timeToMilliseconds(timeInput[0].value)
-            , endTime = timeToMilliseconds(timeInput[1].value);
+        , endTime = timeToMilliseconds(timeInput[1].value);
 
         if (startTime === null || endTime === null) {
             if (e.target.classList.contains("input-min")) {
@@ -674,6 +674,8 @@
         startTime = rangeInput[0].value / 1000;
         endTime = rangeInput[1].value / 1000;
         video.currentTime = startTime;
+        video.playbackRate = 0.3; // 減慢影片播放速度至 0.3x，以免遺漏幀
+        video.muted=true;
         video.play();
         captureFrames();
     });
@@ -826,12 +828,12 @@
     ];
 
     const video = document.getElementById('ani_video_html5_api');
-    let videoDuration = 1420;
+    let videoDuration= 1420;
 
     video.addEventListener('loadedmetadata', () => {
-        if (rangeInput) {
-            rangeInput.forEach((input) => {
-                input.max = Math.floor(video.duration) * 1000;
+        if(rangeInput){
+            rangeInput.forEach((input)=>{
+                input.max= Math.floor(video.duration)*1000;
             });
             updatePercentage(rangeInput[0].value / rangeInput[0].max, rangeInput[1].value / rangeInput[1].max);
         }
@@ -843,36 +845,36 @@
         window.gifList = new Map();
         if (typeof GIF !== 'undefined') {
             let gifLoading = fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error("Network response was not OK");
-                    }
-                    window.workerBlob = response.blob();
-                    return window.workerBlob;
-                }).then(workerBlob => {
-                    for (let i = 0; i < 4; i++) {
-                        let gif = new GIF({
-                            workers: 4,
-                            workerScript: URL.createObjectURL(workerBlob),
-                            quality: 0,
-                            repeat: 0,
-                            width: videoResolutions[i].width,
-                            height: videoResolutions[i].height,
-                            background: '#ffffff'
-                        });
-                        gif.on('finished', function (blob) {
-                            const gifUrl = URL.createObjectURL(blob);
-                            let displayStartTime = formatTime(startTime * 1000);
-                            let displayEndTime = formatTime(endTime * 1000);
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Network response was not OK");
+                }
+                window.workerBlob = response.blob();
+                return window.workerBlob;
+            }).then(workerBlob => {
+                for (let i = 0; i < 4; i++) {
+                    let gif = new GIF({
+                        workers: 4,
+                        workerScript: URL.createObjectURL(workerBlob),
+                        quality: 0,
+                        repeat: 0,
+                        width: videoResolutions[i].width,
+                        height: videoResolutions[i].height,
+                        background: '#ffffff'
+                    });
+                    gif.on('finished', function (blob) {
+                        const gifUrl = URL.createObjectURL(blob);
+                        let displayStartTime = formatTime(startTime * 1000);
+                        let displayEndTime = formatTime(endTime * 1000);
 
-                            let fileName = document.title.match(/(.+?\[\d+\])/);
-                            if (fileName) {
-                                fileName = fileName[0] + ' ' + displayStartTime + '-' + displayEndTime;
-                            } else {
-                                fileName = displayStartTime + '-' + displayEndTime;
-                            }
+                        let fileName = document.title.match(/(.+?\[\d+\])/);
+                        if (fileName) {
+                            fileName = fileName[0] + ' ' + displayStartTime + '-' + displayEndTime;
+                        } else {
+                            fileName = displayStartTime + '-' + displayEndTime;
+                        }
 
-                            const cardHTML = `
+                        const cardHTML = `
                                 <div class="card">
                                     <div class="image_container">
                                         <img class="image" src="${gifUrl}" alt="Image Description" />
@@ -893,23 +895,24 @@
                                 </div>
                             `;
 
-                            imgsContainer.innerHTML += cardHTML;
+                        imgsContainer.innerHTML += cardHTML;
 
-                            window.gifList.get(videoResolutions[i].width).abort();
-                            window.gifList.get(videoResolutions[i].width).frames = [];
-                            gifRenderingInProgress = false;
-                            if (imgsContainer.querySelectorAll('.card').length >= 3) {
-                                imgsContainer.classList.add('image-container-override');
-                            }
-                        });
-                        gif.on('progress', function (progress) {
-                            progressElement.style.width = `${Math.round(progress * 100)}%`; // 直接同步進度條
-                            percentage.textContent = `${Math.round(progress * 100)}%`; // 更新百分比顯示
-                        });
-                        window.gifList.set(videoResolutions[i].width, gif);
-                    }
+                        window.gifList.get(videoResolutions[i].width).abort();
+                        window.gifList.get(videoResolutions[i].width).frames = [];
+                        gifRenderingInProgress = false;
+                        if (imgsContainer.querySelectorAll('.card').length >= 3) {
+                            imgsContainer.classList.add('image-container-override');
+                            imgsContainer.scrollLeft = imgsContainer.scrollWidth;
+                        }
+                    });
+                    gif.on('progress', function (progress) {
+                        progressElement.style.width = `${Math.round(progress * 100)}%`; // 直接同步進度條
+                        percentage.textContent = `${Math.round(progress * 100)}%`; // 更新百分比顯示
+                    });
+                    window.gifList.set(videoResolutions[i].width, gif);
+                }
 
-                }).catch(error => console.error("Error loading GIF worker:", error));
+            }).catch(error => console.error("Error loading GIF worker:", error));
 
         } else {
             console.log('Failed to find GIF class!');
@@ -919,6 +922,8 @@
     let startTime = 0;
     let endTime = 15;
     let gifRenderingInProgress = false; // 用來標記是否正在進行渲染
+    let lastExpectedDisplayTime = null;
+    let frameDisplayDurations = [];
 
     function captureFrames() {
         isParsing = true;
@@ -941,19 +946,36 @@
 
             const img = new Image();
             img.src = imageURL;
+
+            const currentExpectedDisplayTime = metadata.mediaTime * 1000;
+
+            if (lastExpectedDisplayTime !== null) {
+                // 計算前一幀顯示時長
+                const displayDuration = currentExpectedDisplayTime - lastExpectedDisplayTime;
+                frameDisplayDurations.push(displayDuration);
+            }
+
+            // 更新上一幀的 expectedDisplayTime
+            lastExpectedDisplayTime = currentExpectedDisplayTime;
+
             window.gifList.get(canvas.width).addFrame(img, { delay: 125 });
             // 如果影片播放時間達到停止的時間，則停止捕捉
             if (video.currentTime >= endTime) {
+                frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length-1]);
+                const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
+                video.playbackRate = 1; //調整影片為正常撥放速率
                 isParsing = false;
-                //計算每秒幾幀
-                const fps = ((endTime - startTime) * 1000) / window.gifList.get(canvas.width).frames.length;
                 for (let i = 0; i < window.gifList.get(canvas.width).frames.length; i++) {
-                    window.gifList.get(canvas.width).frames[i].delay = fps;
+                    //window.gifList.get(canvas.width).frames[i].delay = frameDisplayDurations[i];
+                    window.gifList.get(canvas.width).frames[i].delay = averageFrameDisplayDuration;
                 }
                 resolutionProgressElement.style.width = `${100}%`;
                 resolutionPercentage.textContent = `${100}%`;
                 window.gifList.get(canvas.width).render();
                 gifRenderingInProgress = true;
+                frameDisplayDurations=[];
+                lastExpectedDisplayTime=null;
+                video.muted=false;
                 return;
             }
 
@@ -973,5 +995,6 @@
         resolutionProgressElement.style.width = `${0}%`;
         resolutionPercentage.textContent = `${0}%`;
     }
+
 
 })();
