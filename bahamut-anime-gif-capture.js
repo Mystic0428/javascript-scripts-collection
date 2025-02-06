@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      0.7
+// @version      0.9
 // @description  把動畫瘋內容片段轉成GIF
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -508,7 +508,7 @@
     function handleTimeChange(e) {
 
         let startTime = timeToMilliseconds(timeInput[0].value)
-        , endTime = timeToMilliseconds(timeInput[1].value);
+            , endTime = timeToMilliseconds(timeInput[1].value);
 
         if (startTime === null || endTime === null) {
             if (e.target.classList.contains("input-min")) {
@@ -519,7 +519,7 @@
             return;
         }
 
-        if (endTime < timeGap || startTime < 0 || endTime > rangeInput[1].max || startTime > rangeInput[0].max) {
+        if (endTime - startTime < timeGap || startTime < 0 || endTime > rangeInput[1].max || startTime > rangeInput[0].max) {
             if (e.target.classList.contains("input-min")) {
                 timeInput[0].value = formatTime(rangeInput[0].value);
             } else {
@@ -539,12 +539,13 @@
                     timeInput[1].value = formatTime(startTime + timeRange);
                 }
             } else {
-                if (startTime + timeRange > rangeInput[0].min) {
-                    rangeInput[0].value = rangeInput[0].min
-                    timeInput[0].value = formatTime(rangeInput[0].min);
-                } else {
+                rangeInput[1].value = endTime;
+                if (endTime - timeRange > rangeInput[0].min) {
                     rangeInput[0].value = endTime - timeRange;
-                    timeInput[0].value = formatTime(endTime - timeRange);
+                    timeInput[0].value = formatTime(rangeInput[0].value);
+                } else {
+                    rangeInput[0].value = rangeInput[0].min;
+                    timeInput[0].value = formatTime(rangeInput[0].min);
                 }
                 rangeInput[1].value = endTime;
             }
@@ -553,7 +554,6 @@
         }
 
         if (endTime - startTime >= timeGap && endTime <= rangeInput[1].max) {
-
             if (endTime - startTime > timeRange) {
                 if (e.target.classList.contains("input-min")) {
                     rangeInput[0].value = startTime;
@@ -675,7 +675,7 @@
         endTime = rangeInput[1].value / 1000;
         video.currentTime = startTime;
         video.playbackRate = 0.3; // 減慢影片播放速度至 0.3x，以免遺漏幀
-        video.muted=true;
+        video.muted = true;
         video.play();
         captureFrames();
     });
@@ -828,12 +828,12 @@
     ];
 
     const video = document.getElementById('ani_video_html5_api');
-    let videoDuration= 1420;
+    let videoDuration = 1420;
 
     video.addEventListener('loadedmetadata', () => {
-        if(rangeInput){
-            rangeInput.forEach((input)=>{
-                input.max= Math.floor(video.duration)*1000;
+        if (rangeInput) {
+            rangeInput.forEach((input) => {
+                input.max = Math.floor(video.duration) * 1000;
             });
             updatePercentage(rangeInput[0].value / rangeInput[0].max, rangeInput[1].value / rangeInput[1].max);
         }
@@ -845,36 +845,36 @@
         window.gifList = new Map();
         if (typeof GIF !== 'undefined') {
             let gifLoading = fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Network response was not OK");
-                }
-                window.workerBlob = response.blob();
-                return window.workerBlob;
-            }).then(workerBlob => {
-                for (let i = 0; i < 4; i++) {
-                    let gif = new GIF({
-                        workers: 4,
-                        workerScript: URL.createObjectURL(workerBlob),
-                        quality: 0,
-                        repeat: 0,
-                        width: videoResolutions[i].width,
-                        height: videoResolutions[i].height,
-                        background: '#ffffff'
-                    });
-                    gif.on('finished', function (blob) {
-                        const gifUrl = URL.createObjectURL(blob);
-                        let displayStartTime = formatTime(startTime * 1000);
-                        let displayEndTime = formatTime(endTime * 1000);
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Network response was not OK");
+                    }
+                    window.workerBlob = response.blob();
+                    return window.workerBlob;
+                }).then(workerBlob => {
+                    for (let i = 0; i < 4; i++) {
+                        let gif = new GIF({
+                            workers: 4,
+                            workerScript: URL.createObjectURL(workerBlob),
+                            quality: 0,
+                            repeat: 0,
+                            width: videoResolutions[i].width,
+                            height: videoResolutions[i].height,
+                            background: '#ffffff'
+                        });
+                        gif.on('finished', function (blob) {
+                            const gifUrl = URL.createObjectURL(blob);
+                            let displayStartTime = formatTime(startTime * 1000);
+                            let displayEndTime = formatTime(endTime * 1000);
 
-                        let fileName = document.title.match(/(.+?\[\d+\])/);
-                        if (fileName) {
-                            fileName = fileName[0] + ' ' + displayStartTime + '-' + displayEndTime;
-                        } else {
-                            fileName = displayStartTime + '-' + displayEndTime;
-                        }
+                            let fileName = document.title.match(/(.+?\[\d+\])/);
+                            if (fileName) {
+                                fileName = fileName[0] + ' ' + displayStartTime + '-' + displayEndTime;
+                            } else {
+                                fileName = displayStartTime + '-' + displayEndTime;
+                            }
 
-                        const cardHTML = `
+                            const cardHTML = `
                                 <div class="card">
                                     <div class="image_container">
                                         <img class="image" src="${gifUrl}" alt="Image Description" />
@@ -895,24 +895,24 @@
                                 </div>
                             `;
 
-                        imgsContainer.innerHTML += cardHTML;
+                            imgsContainer.innerHTML += cardHTML;
 
-                        window.gifList.get(videoResolutions[i].width).abort();
-                        window.gifList.get(videoResolutions[i].width).frames = [];
-                        gifRenderingInProgress = false;
-                        if (imgsContainer.querySelectorAll('.card').length >= 3) {
-                            imgsContainer.classList.add('image-container-override');
-                            imgsContainer.scrollLeft = imgsContainer.scrollWidth;
-                        }
-                    });
-                    gif.on('progress', function (progress) {
-                        progressElement.style.width = `${Math.round(progress * 100)}%`; // 直接同步進度條
-                        percentage.textContent = `${Math.round(progress * 100)}%`; // 更新百分比顯示
-                    });
-                    window.gifList.set(videoResolutions[i].width, gif);
-                }
+                            window.gifList.get(videoResolutions[i].width).abort();
+                            window.gifList.get(videoResolutions[i].width).frames = [];
+                            gifRenderingInProgress = false;
+                            if (imgsContainer.querySelectorAll('.card').length >= 3) {
+                                imgsContainer.classList.add('image-container-override');
+                                imgsContainer.scrollLeft = imgsContainer.scrollWidth;
+                            }
+                        });
+                        gif.on('progress', function (progress) {
+                            progressElement.style.width = `${Math.round(progress * 100)}%`; // 直接同步進度條
+                            percentage.textContent = `${Math.round(progress * 100)}%`; // 更新百分比顯示
+                        });
+                        window.gifList.set(videoResolutions[i].width, gif);
+                    }
 
-            }).catch(error => console.error("Error loading GIF worker:", error));
+                }).catch(error => console.error("Error loading GIF worker:", error));
 
         } else {
             console.log('Failed to find GIF class!');
@@ -960,8 +960,9 @@
 
             window.gifList.get(canvas.width).addFrame(img, { delay: 125 });
             // 如果影片播放時間達到停止的時間，則停止捕捉
-            if (video.currentTime >= endTime) {
-                frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length-1]);
+            if (video.currentTime >= endTime || video.currentTime >= Math.floor(video.duration)) {
+
+                frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
                 const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
                 video.playbackRate = 1; //調整影片為正常撥放速率
                 isParsing = false;
@@ -973,9 +974,9 @@
                 resolutionPercentage.textContent = `${100}%`;
                 window.gifList.get(canvas.width).render();
                 gifRenderingInProgress = true;
-                frameDisplayDurations=[];
-                lastExpectedDisplayTime=null;
-                video.muted=false;
+                frameDisplayDurations = [];
+                lastExpectedDisplayTime = null;
+                video.muted = false;
                 return;
             }
 
@@ -995,6 +996,5 @@
         resolutionProgressElement.style.width = `${0}%`;
         resolutionPercentage.textContent = `${0}%`;
     }
-
 
 })();
