@@ -440,6 +440,7 @@
            padding: 15px;
            margin-bottom: 20px;
            border: 1px solid #ccc;
+           width: 90%;
         }
         
         .section-label {
@@ -504,13 +505,13 @@
                 </svg>
             </button>
         </div>
-        
-        <div class="tool-section" style="text-align: center;">
-            <span class="section-label">📷 即時擷取</span>
-            <button type="button" class="flip-card__btn screenshot-btn-main" id="screenshotButton">立即截圖 (Ctrl + Shift + S)</button>
-            <p style="font-size: 12px; color: #666; margin-top: 8px;">提示：支援原始解析度擷取，抓取當前撥放時間，不影響播放狀態</p>
+        <div class="content-container">
+            <div class="tool-section" style="text-align: center;">
+                <span class="section-label">📷 即時擷取</span>
+                <button type="button" class="flip-card__btn screenshot-btn-main" id="screenshotButton">立即截圖 (Ctrl + Shift + S)</button>
+                <p style="font-size: 12px; color: #666; margin-top: 8px;">提示：支援原始解析度擷取，抓取當前撥放時間，不影響播放狀態</p>
+            </div> 
         </div>
-        
         <form class="flip-card__form" action="">
             <div class="d-flex">
                 <div class="range-wrapper">
@@ -547,7 +548,6 @@
                         <input type="range" class="range-max" min="0" max="1420000" value="15000" step="100">
                     </div>
                     <div class="control-btn">
-                        <button type="button" class="flip-card__btn" id="screenshotButton">截圖</button>
                         <button type="button" class="flip-card__btn" id="generateButton">生成</button>
                         <button type="button" class="flip-card__btn" id="reset-btn">重置</button>
                     </div>
