@@ -448,7 +448,7 @@
            font-weight: 900;
            color: #555;
            margin-bottom: 10px;
-           font-size: 14px;
+           font-size: 24px;
            text-transform: uppercase;
            letter-spacing: 1px;
         }
