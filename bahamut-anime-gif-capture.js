@@ -343,6 +343,8 @@
             margin: 20px 0 0;
             display: flex;
             justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .card {
@@ -696,6 +698,7 @@
                     <div class="control-btn">
                         <button type="button" class="flip-card__btn" id="generateButton">生成</button>
                         <button type="button" class="flip-card__btn" id="reset-btn">重置</button>
+                        <button type="button" class="flip-card__btn" id="syncToCurrentBtn" title="把範圍起點設成目前影片時間">跳到目前時間</button>
                     </div>
                 </div>
             </div>
@@ -1491,6 +1494,14 @@
         resetButton.addEventListener('click', (e) => {
             resetTime();
         });
+
+        const syncToCurrentBtn = document.getElementById('syncToCurrentBtn');
+        if (syncToCurrentBtn) {
+            syncToCurrentBtn.addEventListener('click', () => {
+                if (isParsing || gifRenderingInProgress) return;
+                syncTimeRangeToCurrentPlayback();
+            });
+        }
 
     };
 
