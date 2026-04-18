@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.13
+// @version      1.14
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -544,15 +544,24 @@
             white-space: nowrap;
         }
 
-        .resolution-select-row {
+        .selects-row {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 20px;
             margin-top: 10px;
         }
 
-        .resolution-select {
+        .resolution-select-row,
+        .fps-select-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .resolution-select,
+        .fps-select {
             width: 140px;
             height: 32px;
             font-size: var(--text-sm);
@@ -703,15 +712,26 @@
                         <input type="range" class="range-min" min="0" max="1420000" value="0" step="100">
                         <input type="range" class="range-max" min="0" max="1420000" value="15000" step="100">
                     </div>
-                    <div class="resolution-select-row">
-                        <label for="resolutionSelect">輸出解析度：</label>
-                        <select id="resolutionSelect" class="flip-card__input resolution-select">
-                            <option value="">原始（跟隨來源）</option>
-                            <option value="1920">1080p</option>
-                            <option value="1280">720p</option>
-                            <option value="960">540p</option>
-                            <option value="640">360p</option>
-                        </select>
+                    <div class="selects-row">
+                        <div class="resolution-select-row">
+                            <label for="resolutionSelect">輸出解析度：</label>
+                            <select id="resolutionSelect" class="flip-card__input resolution-select">
+                                <option value="">原始（跟隨來源）</option>
+                                <option value="1920">1080p</option>
+                                <option value="1280">720p</option>
+                                <option value="960">540p</option>
+                                <option value="640">360p</option>
+                            </select>
+                        </div>
+                        <div class="fps-select-row">
+                            <label for="fpsSelect">幀率：</label>
+                            <select id="fpsSelect" class="flip-card__input fps-select">
+                                <option value="">原生（跟隨來源）</option>
+                                <option value="12">12 fps</option>
+                                <option value="8">8 fps</option>
+                                <option value="5">5 fps</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="control-btn">
                         <button type="button" class="flip-card__btn flip-card__btn--primary" id="generateButton">生成</button>
@@ -743,6 +763,7 @@
     const resolutionProgressElement = document.getElementById('resolutionProgress');
     const resolutionPercentage = document.getElementById('resolutionPercentage');
     const resolutionSelect = document.getElementById('resolutionSelect');
+    const fpsSelect = document.getElementById('fpsSelect');
     const sliderTooltipMin = document.getElementById('sliderTooltipMin');
     const sliderTooltipMax = document.getElementById('sliderTooltipMax');
     const video = document.getElementById('ani_video_html5_api');
@@ -760,6 +781,8 @@
     let currentWidth = 1920;
     let preCaptureCurrentTime = null; // 擷取開始時的播放位置，取消時用來 seek 回去
     let selectedResolution = null; // 使用者在下拉選單指定的輸出解析度；null = 跟隨來源
+    let capturedFps = null; // 擷取當次鎖定的目標 fps；null = 跟隨來源
+    let lastSampledMediaTime = null; // 上次採樣的 mediaTime（ms），用於 fps 採樣間距判斷
     let videoDuration = 1420;
 
     // ==================== 通用 helpers ====================
@@ -1035,6 +1058,11 @@
             ? videoResolutions.find(r => r.width === parseInt(selectedValue, 10)) || null
             : null;
 
+        // 鎖定此次擷取的目標幀率；null = 不降採樣、跟隨來源
+        const fpsValue = fpsSelect && fpsSelect.value;
+        capturedFps = fpsValue ? parseInt(fpsValue, 10) : null;
+        lastSampledMediaTime = null;
+
         // 這個回調將每一幀都調用
         function frameCallback(now, metadata) {
             // 使用者按取消 → cancelCapture 會把 isParsing 設為 false，這裡直接跳出不再排下一幀
@@ -1045,6 +1073,23 @@
                 video.requestVideoFrameCallback(frameCallback);
                 return;
             }
+
+            const currentExpectedDisplayTime = metadata.mediaTime * 1000;
+
+            // fps 採樣：未達採樣間距的幀直接丟（不 drawImage / addFrame）
+            // 仍要檢擷取結束條件，避免最後一幀落在 skip 分支導致 capture 不收尾
+            if (capturedFps && lastSampledMediaTime !== null) {
+                const sampleInterval = 1000 / capturedFps;
+                if (currentExpectedDisplayTime - lastSampledMediaTime < sampleInterval) {
+                    if (video.currentTime >= endTime || video.currentTime >= Math.floor(video.duration)) {
+                        finalizeCapture({ render: true });
+                        return;
+                    }
+                    video.requestVideoFrameCallback(frameCallback);
+                    return;
+                }
+            }
+
             // 使用者指定的輸出解析度必須小於來源才降畫質；高過來源就忽略避免無謂 upscale
             const useOverride = selectedResolution && selectedResolution.width < metadata.width;
             const outWidth = useOverride ? selectedResolution.width : metadata.width;
@@ -1059,16 +1104,15 @@
             canvas.height = outHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            const currentExpectedDisplayTime = metadata.mediaTime * 1000;
-
             if (lastExpectedDisplayTime !== null) {
                 // 計算前一幀顯示時長
                 const displayDuration = currentExpectedDisplayTime - lastExpectedDisplayTime;
                 frameDisplayDurations.push(displayDuration);
             }
 
-            // 更新上一幀的 expectedDisplayTime
+            // 更新上一幀的 expectedDisplayTime + 採樣基準
             lastExpectedDisplayTime = currentExpectedDisplayTime;
+            lastSampledMediaTime = currentExpectedDisplayTime;
 
             const gifInstance = getOrCreateGif(canvas.width, canvas.height);
             if (!gifInstance) {
@@ -1138,15 +1182,25 @@
             return;
         }
 
-        if (!frameDisplayDurations.length || !gifInstance.frames.length) {
+        if (!gifInstance.frames.length) {
             showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
             return;
         }
 
-        frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
-        const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
+        let frameDelay;
+        if (capturedFps) {
+            // 鎖定 fps 時 delay 直接用目標間距，GIF 播放速度不會因降採樣而變快
+            frameDelay = 1000 / capturedFps;
+        } else {
+            if (!frameDisplayDurations.length) {
+                showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
+                return;
+            }
+            frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
+            frameDelay = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
+        }
         for (let i = 0; i < gifInstance.frames.length; i++) {
-            gifInstance.frames[i].delay = averageFrameDisplayDuration;
+            gifInstance.frames[i].delay = frameDelay;
         }
         resolutionProgressElement.style.width = `${100}%`;
         resolutionPercentage.textContent = `${100}%`;
