@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.8
+// @version      1.9
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -416,6 +416,20 @@
             white-space: nowrap;
         }
 
+        .resolution-select-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .resolution-select {
+            width: 140px;
+            height: 32px;
+            font-size: 14px;
+        }
+
         .progress-text {
             font-weight: 600;
             font-size: 19px;
@@ -558,6 +572,16 @@
                     <div class="range-input">
                         <input type="range" class="range-min" min="0" max="1420000" value="0" step="100">
                         <input type="range" class="range-max" min="0" max="1420000" value="15000" step="100">
+                    </div>
+                    <div class="resolution-select-row">
+                        <label for="resolutionSelect">輸出解析度：</label>
+                        <select id="resolutionSelect" class="flip-card__input resolution-select">
+                            <option value="">原始（跟隨來源）</option>
+                            <option value="1920">1080p</option>
+                            <option value="1280">720p</option>
+                            <option value="960">540p</option>
+                            <option value="640">360p</option>
+                        </select>
                     </div>
                     <div class="control-btn">
                         <button type="button" class="flip-card__btn" id="generateButton">生成</button>
@@ -802,6 +826,7 @@
     const percentage = document.getElementById('percentage');
     const resolutionProgressElement = document.getElementById('resolutionProgress');
     const resolutionPercentage = document.getElementById('resolutionPercentage');
+    const resolutionSelect = document.getElementById('resolutionSelect');
     let isParsing = false;
 
     function showPopup() {
@@ -1101,6 +1126,7 @@
     let frameDisplayDurations = [];
     let currentWidth = 1920;
     let preCaptureCurrentTime = null; // 擷取開始時的播放位置，取消時用來 seek 回去
+    let selectedResolution = null; // 使用者在下拉選單指定的輸出解析度；null = 跟隨來源
 
     function captureFrames() {
         if (!video) {
@@ -1114,6 +1140,12 @@
         isParsing = true;
         preCaptureCurrentTime = video.currentTime;
 
+        // 鎖定此次擷取的目標解析度；mid-flight 改下拉選單不會影響進行中的擷取
+        const selectedValue = resolutionSelect && resolutionSelect.value;
+        selectedResolution = selectedValue
+            ? videoResolutions.find(r => r.width === parseInt(selectedValue, 10)) || null
+            : null;
+
         // 這個回調將每一幀都調用
         function frameCallback(now, metadata) {
             // 使用者按取消 → cancelCapture 會把 isParsing 設為 false，這裡直接跳出不再排下一幀
@@ -1124,14 +1156,18 @@
                 video.requestVideoFrameCallback(frameCallback);
                 return;
             }
-            currentWidth = metadata.width;
+            // 使用者指定的輸出解析度必須小於來源才降畫質；高過來源就忽略避免無謂 upscale
+            const useOverride = selectedResolution && selectedResolution.width < metadata.width;
+            const outWidth = useOverride ? selectedResolution.width : metadata.width;
+            const outHeight = useOverride ? selectedResolution.height : metadata.height;
+            currentWidth = outWidth;
 
             // 每幀 new canvas 是為了讓 gif.js 以 copy:false 存 canvas reference，render 時才 readback
             // （共用 canvas + 當下 readback 會和 video decoder 在 GPU 端互搶，導致 MEDIA_ERR_DECODE）
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
-            canvas.width = metadata.width;
-            canvas.height = metadata.height;
+            canvas.width = outWidth;
+            canvas.height = outHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const currentExpectedDisplayTime = metadata.mediaTime * 1000;
