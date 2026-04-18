@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.3
+// @version      1.4
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -110,7 +110,7 @@
         }
 
         .close-button {
-            appaerance: none;
+            appearance: none;
             font: inherit;
             border: none;
             background: none;
@@ -468,9 +468,9 @@
         }
         
         .screenshot-toast {
-           position: fixed;
-           top: 20px;
-           left: 50%;
+            position: fixed;
+            top: 20px;
+            left: 50%;
            transform: translateX(-50%);
            background: rgba(0, 0, 0, 0.8);
            color: white;
@@ -479,7 +479,19 @@
            z-index: 10001;
            font-weight: bold;
            pointer-events: none;
-           animation: fadeInOut 1.5s forwards;
+            animation: fadeInOut 1.5s forwards;
+        }
+
+        .screenshot-toast--error {
+            background: rgba(180, 40, 40, 0.92);
+        }
+
+        .screenshot-toast--warning {
+            background: rgba(168, 112, 0, 0.92);
+        }
+
+        .screenshot-toast--success {
+            background: rgba(28, 110, 68, 0.92);
         }
 
         @keyframes fadeInOut {
@@ -568,6 +580,17 @@
     let rangeInput, timeInput, range, imgsContainer, resetButton;
     let timeGap = 500;
     let timeRange = 15000;
+
+    function showToast(message, type = 'success', duration = 1500) {
+        const toast = document.createElement('div');
+        toast.className = `screenshot-toast screenshot-toast--${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, duration);
+    }
 
     function handleTimeChange(e) {
 
@@ -705,7 +728,7 @@
 
     function resetTime() {
         if (gifRenderingInProgress || isParsing) {
-            console.log('正在進行中');
+            showToast('正在處理中，請稍候', 'warning');
             return;
         }
         rangeInput[0].value = 0;
@@ -717,6 +740,26 @@
         updatePercentage(0 / rangeInput[0].max, 15000 / rangeInput[1].max);
     }
 
+    function syncTimeRangeToCurrentPlayback() {
+        if (!video || !rangeInput || !rangeInput.length) return;
+        const maxMs = parseInt(rangeInput[1].max);
+        if (!Number.isFinite(maxMs) || maxMs <= 0) return;
+
+        const currentMs = Math.round((video.currentTime || 0) * 1000 / 100) * 100;
+        let startMs = Math.max(0, Math.min(currentMs, maxMs - timeGap));
+        let endMs = startMs + timeRange;
+        if (endMs > maxMs) {
+            endMs = maxMs;
+            startMs = Math.max(0, endMs - timeRange);
+        }
+
+        rangeInput[0].value = startMs;
+        rangeInput[1].value = endMs;
+        timeInput[0].value = formatTime(startMs);
+        timeInput[1].value = formatTime(endMs);
+        updatePercentage(startMs / maxMs, endMs / maxMs);
+    }
+
     document.body.insertAdjacentHTML('beforeend', popupHTML);
 
     // 關閉按鈕事件
@@ -725,14 +768,19 @@
     // 設置生成按鈕的事件監聽器
     document.getElementById('generateButton').addEventListener('click', function () {
         if (gifRenderingInProgress || isParsing) {
-            console.log('正在進行中');
+            showToast('正在處理中，請稍候', 'warning');
+            return;
+        }
+        if (!video) {
+            showToast('找不到影片播放器，請重新整理頁面', 'error', 2200);
             return;
         }
         resetProgress();
         startTime = rangeInput[0].value / 1000;
         endTime = rangeInput[1].value / 1000;
         video.currentTime = startTime;
-        video.playbackRate = 0.3; // 減慢影片播放速度至 0.3x，以免遺漏幀
+        // 以 1x 正常速率擷取：每幀工作已優化至 ~2ms，24fps 的 42ms budget 夠用，
+        // 且能避開長時間 0.3x 慢放讓 decoder 不穩（觀察到的 MEDIA_ERR_DECODE）
         video.muted = true;
         video.play();
         captureFrames();
@@ -750,6 +798,9 @@
         if (document.querySelector('.video-adHandler-background-blocker')) {
             return;
         }
+        if (!gifRenderingInProgress && !isParsing) {
+            syncTimeRangeToCurrentPlayback();
+        }
         popup.style.display = 'flex';
         window.scrollTo({
             top: 0, behavior: 'smooth'
@@ -764,22 +815,40 @@
     }
 
 
-    document.addEventListener('keydown', function (event) {
+    function handleGlobalKeydown(event) {
+        const activeElement = document.activeElement;
+        const isTyping = activeElement && (
+            ['INPUT', 'TEXTAREA'].includes(activeElement.tagName) || activeElement.isContentEditable
+        );
 
-        // 當按下 Shift + G
-        if (event.shiftKey && event.code === 'KeyG') {
-            showPopup();
+        if (isTyping) {
+            return;
         }
 
-        // 當按下 ESC
+        if (event.shiftKey && event.code === 'KeyG') {
+            showPopup();
+            return;
+        }
+
+        if (event.ctrlKey && event.shiftKey && event.code === 'KeyS') {
+            event.preventDefault();
+            captureScreenshot();
+            return;
+        }
+
         if (event.key === 'Escape') {
             closePopup();
         }
+    }
 
-    });
+    document.addEventListener('keydown', handleGlobalKeydown);
 
     window.onload = function () {
         rangeInput = document.querySelectorAll(".range-input input"), timeInput = document.querySelectorAll(".price-input input"), range = document.querySelector(".slider .progress"), imgsContainer = document.querySelector('.imgs-container'), resetButton = document.querySelector('#reset-btn');
+        if (!rangeInput.length || !timeInput.length || !range || !imgsContainer || !resetButton) {
+            showToast('工具初始化失敗，請重新整理頁面', 'error', 2200);
+            return;
+        }
         //把GIF圖示插入到Control Bar
         const targetContainer = document.querySelector('.control-bar-rightbtn');
         const newDiv = document.createElement('div');
@@ -796,6 +865,7 @@
             });
         } else {
             console.error('找不到 .control-bar-rightbtn 容器');
+            showToast('找不到播放器工具列，無法插入 GIF 按鈕', 'warning', 2400);
         }
 
         timeInput.forEach((input) => {
@@ -805,7 +875,7 @@
             });
 
             input.addEventListener("keydown", function (e) {
-                if (event.keyCode == 13) {
+                if (e.key === 'Enter') {
                     e.preventDefault();
                     handleTimeChange(e);
                 }
@@ -881,20 +951,41 @@
     const video = document.getElementById('ani_video_html5_api');
     let videoDuration = 1420;
 
-    video.addEventListener('loadedmetadata', () => {
-        if (rangeInput) {
-            rangeInput.forEach((input) => {
-                input.max = Math.floor(video.duration) * 1000;
-            });
-            updatePercentage(rangeInput[0].value / rangeInput[0].max, rangeInput[1].value / rangeInput[1].max);
-        }
-    });
+    if (video) {
+        video.addEventListener('loadedmetadata', () => {
+            if (rangeInput && rangeInput.length) {
+                rangeInput.forEach((input) => {
+                    input.max = Math.floor(video.duration) * 1000;
+                });
+                updatePercentage(rangeInput[0].value / rangeInput[0].max, rangeInput[1].value / rangeInput[1].max);
+            }
+        });
+    } else {
+        console.error('找不到影片元素 #ani_video_html5_api');
+        showToast('找不到影片播放器，部分功能將無法使用', 'error', 2600);
+    }
 
     // 等待 gif.js 加載完成
     script.onload = function () {
         // 檢查 GIF 類是否可用
         window.gifList = new Map();
         if (typeof GIF !== 'undefined') {
+            // render 階段 gif.js 會對 360+ 幀做 drawImage+getImageData，若內部 canvas 是 GPU-backed
+            // 會觸發連續 GPU→CPU readback，跟 video decoder 搶 GPU 管線 → 觸發 MEDIA_ERR_DECODE。
+            // 預先讓 gif.js 的內部 canvas 走 willReadFrequently（CPU-backed），readback 在 CPU 側完成
+            if (GIF.prototype && typeof GIF.prototype.getImageData === 'function') {
+                const origGetImageData = GIF.prototype.getImageData;
+                GIF.prototype.getImageData = function (image) {
+                    if (!this._canvas) {
+                        this._canvas = document.createElement('canvas');
+                        this._canvas.width = image.width;
+                        this._canvas.height = image.height;
+                        this._canvas.getContext('2d', { willReadFrequently: true });
+                    }
+                    return origGetImageData.call(this, image);
+                };
+            }
+
             let gifLoading = fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
                 .then((response) => {
                     if (!response.ok) {
@@ -963,10 +1054,14 @@
                         window.gifList.set(videoResolutions[i].width, gif);
                     }
 
-                }).catch(error => console.error("Error loading GIF worker:", error));
+                }).catch(error => {
+                    console.error("Error loading GIF worker:", error);
+                    showToast('GIF 元件載入失敗，請稍後再試', 'error', 2200);
+                });
 
         } else {
             console.log('Failed to find GIF class!');
+            showToast('GIF 元件初始化失敗', 'error', 2200);
         }
     };
 
@@ -978,6 +1073,14 @@
     let currentWidth = 1920;
 
     function captureFrames() {
+        if (!video) {
+            showToast('找不到影片播放器，無法擷取', 'error', 2200);
+            return;
+        }
+        if (!window.gifList || !window.gifList.size) {
+            showToast('GIF 元件尚未準備完成，請稍候', 'warning', 2200);
+            return;
+        }
         isParsing = true;
 
         // 這個回調將每一幀都調用
@@ -989,16 +1092,14 @@
                 return;
             }
             currentWidth = metadata.width;
+
+            // 每幀 new canvas 是為了讓 gif.js 以 copy:false 存 canvas reference，render 時才 readback
+            // （共用 canvas + 當下 readback 會和 video decoder 在 GPU 端互搶，導致 MEDIA_ERR_DECODE）
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
-
             canvas.width = metadata.width;
             canvas.height = metadata.height;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageURL = canvas.toDataURL('image/png');
-
-            const img = new Image();
-            img.src = imageURL;
 
             const currentExpectedDisplayTime = metadata.mediaTime * 1000;
 
@@ -1011,7 +1112,16 @@
             // 更新上一幀的 expectedDisplayTime
             lastExpectedDisplayTime = currentExpectedDisplayTime;
 
-            window.gifList.get(canvas.width).addFrame(img, {delay: 125});
+            const gifInstance = window.gifList.get(canvas.width);
+            if (!gifInstance) {
+                isParsing = false;
+                video.muted = false;
+                showToast(`目前不支援 ${canvas.width}px 解析度的 GIF 產生`, 'error', 2400);
+                return;
+            }
+
+            // 直接把 canvas 交給 gif.js（copy:false 預設），省下原版的 toDataURL + new Image 兩步
+            gifInstance.addFrame(canvas, { delay: 125 });
             // 如果影片播放時間達到停止的時間，則停止捕捉
             if (video.currentTime >= endTime || video.currentTime >= Math.floor(video.duration)) {
                 generateGif(canvas.width);
@@ -1036,34 +1146,64 @@
         resolutionPercentage.textContent = `${0}%`;
     }
 
-    video.addEventListener('ended', () => {
-        if (!window.gifList.get(currentWidth).running) {
-            generateGif(currentWidth);
-        }
-    });
+    if (video) {
+        video.addEventListener('ended', () => {
+            const gifInstance = window.gifList && window.gifList.get(currentWidth);
+            if (gifInstance && !gifInstance.running) {
+                generateGif(currentWidth);
+            }
+        });
+    }
 
     function generateGif(videoWidth) {
+        const gifInstance = window.gifList && window.gifList.get(videoWidth);
+        if (!gifInstance) {
+            isParsing = false;
+            gifRenderingInProgress = false;
+            if (video) {
+                video.muted = false;
+            }
+            showToast('GIF 產生器不存在，請重新整理頁面', 'error', 2200);
+            return;
+        }
+
+        if (!frameDisplayDurations.length || !gifInstance.frames.length) {
+            isParsing = false;
+            gifRenderingInProgress = false;
+            if (video) {
+                video.muted = false;
+            }
+            showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
+            return;
+        }
+
         frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
         const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
-        video.playbackRate = 1; //調整影片為正常撥放速率
+        video.muted = false;
         isParsing = false;
-        for (let i = 0; i < window.gifList.get(videoWidth).frames.length; i++) {
-            window.gifList.get(videoWidth).frames[i].delay = averageFrameDisplayDuration;
+        for (let i = 0; i < gifInstance.frames.length; i++) {
+            gifInstance.frames[i].delay = averageFrameDisplayDuration;
         }
         resolutionProgressElement.style.width = `${100}%`;
         resolutionPercentage.textContent = `${100}%`;
-        window.gifList.get(videoWidth).render();
+        gifInstance.render();
         gifRenderingInProgress = true;
         frameDisplayDurations = [];
         lastExpectedDisplayTime = null;
-        video.muted = false;
     }
 
     // ========= 截圖功能相關 =========
 
     function captureScreenshot() {
         const video = document.getElementById('ani_video_html5_api');
-        if (!video) return;
+        if (!video) {
+            showToast('找不到影片播放器，無法截圖', 'error', 2200);
+            return;
+        }
+        if (!imgsContainer) {
+            showToast('找不到結果區塊，無法顯示截圖', 'error', 2200);
+            return;
+        }
 
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
@@ -1106,39 +1246,9 @@
         }
 
         // --- 靜態通知邏輯 ---
-        const toast = document.createElement('div');
-        toast.className = 'screenshot-toast';
-        toast.innerHTML = `📷 截圖已儲存 (${currentTime})`;
-        document.body.appendChild(toast);
-
-        // 1.5 秒後自動移除通知元素
-        setTimeout(() => {
-            toast.remove();
-        }, 1500);
+        showToast(`截圖已儲存 (${currentTime})`);
     }
 
     document.getElementById('screenshotButton').addEventListener('click', captureScreenshot);
-
-    // --- 修改：快捷鍵監聽器 ---
-    document.addEventListener('keydown', function (event) {
-        // 防止在打字時觸發
-        const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable;
-        if (isTyping) return;
-
-        // Shift + G: 開啟工具視窗
-        if (event.shiftKey && event.code === 'KeyG') {
-            showPopup();
-        }
-
-        // Ctrl + Shift + S: 截圖
-        if (event.ctrlKey && event.shiftKey && event.code === 'KeyS') {
-            event.preventDefault(); // 攔截瀏覽器可能的預設存檔行為
-            captureScreenshot();
-            // 如果視窗沒開，截圖時順便打開讓使用者看到結果 (停用)
-            // if (popup.style.display === 'none') showPopup();
-        }
-
-        if (event.key === 'Escape') closePopup();
-    });
 
 })();
