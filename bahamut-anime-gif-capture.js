@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.9
+// @version      1.10
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -14,6 +14,19 @@
 
 (function () {
     'use strict';
+
+    // ==================== 常數 ====================
+
+    const videoResolutions = [
+        { width: 1920, height: 1080, label: "1080p" },
+        { width: 1280, height: 720, label: "720p" },
+        { width: 960, height: 540, label: "540p" },
+        { width: 640, height: 360, label: "360p" }
+    ];
+    const timeGap = 500;
+    const timeRange = 15000;
+
+    // ==================== CSS 樣式 ====================
 
     const style = document.createElement('style');
     style.textContent = `
@@ -447,7 +460,7 @@
         .image-container-override {
            justify-content: normal;
         }
-        
+
         .tool-section {
            background: rgba(0, 0, 0, 0.05);
            border-radius: 10px;
@@ -456,7 +469,7 @@
            border: 1px solid #ccc;
            width: 90%;
         }
-        
+
         .section-label {
            display: block;
            font-weight: 900;
@@ -466,7 +479,7 @@
            text-transform: uppercase;
            letter-spacing: 1px;
         }
-        
+
         .screenshot-btn-main {
            background-color: #3498db !important; /* 藍色系區隔 */
            color: white !important;
@@ -476,11 +489,11 @@
            font-size: 18px !important;
            transition: transform 0.1s;
         }
-        
+
         .screenshot-btn-main:active {
            transform: scale(0.98);
         }
-        
+
         .screenshot-toast {
             position: fixed;
             top: 20px;
@@ -518,6 +531,8 @@
 
     document.head.appendChild(style);
 
+    // ==================== Popup HTML 注入 ====================
+
     const popupHTML = `
     <div class="wrapper flip-card__popup" id="popup">
         <div class="modal__header">
@@ -536,7 +551,7 @@
                 <span class="section-label">📷 即時擷取</span>
                 <button type="button" class="flip-card__btn screenshot-btn-main" id="screenshotButton">立即截圖 (Ctrl + Shift + S)</button>
                 <p style="font-size: 12px; color: #666; margin-top: 8px;">提示：支援原始解析度擷取，抓取當前撥放時間，不影響播放狀態</p>
-            </div> 
+            </div>
         </div>
         <form class="flip-card__form" action="">
             <div class="d-flex">
@@ -601,9 +616,35 @@
     </div>
     `;
 
+    document.body.insertAdjacentHTML('beforeend', popupHTML);
+
+    // ==================== DOM 參照 ====================
+
+    const popup = document.getElementById('popup');
+    const generateButton = document.getElementById('generateButton');
+    const progressElement = document.getElementById('progress');
+    const percentage = document.getElementById('percentage');
+    const resolutionProgressElement = document.getElementById('resolutionProgress');
+    const resolutionPercentage = document.getElementById('resolutionPercentage');
+    const resolutionSelect = document.getElementById('resolutionSelect');
+    const video = document.getElementById('ani_video_html5_api');
+    // 下列 refs 等 window.onload 才 querySelector 填入（同時補 range input 的 max、綁事件）
     let rangeInput, timeInput, range, imgsContainer, resetButton;
-    let timeGap = 500;
-    let timeRange = 15000;
+
+    // ==================== 狀態 ====================
+
+    let isParsing = false;
+    let gifRenderingInProgress = false; // 用來標記是否正在進行渲染
+    let startTime = 0;
+    let endTime = 15;
+    let lastExpectedDisplayTime = null;
+    let frameDisplayDurations = [];
+    let currentWidth = 1920;
+    let preCaptureCurrentTime = null; // 擷取開始時的播放位置，取消時用來 seek 回去
+    let selectedResolution = null; // 使用者在下拉選單指定的輸出解析度；null = 跟隨來源
+    let videoDuration = 1420;
+
+    // ==================== 通用 helpers ====================
 
     function showToast(message, type = 'success', duration = 1500) {
         const toast = document.createElement('div');
@@ -614,6 +655,69 @@
         setTimeout(() => {
             toast.remove();
         }, duration);
+    }
+
+    function formatTime(milliseconds) {
+        const hours = Math.floor(milliseconds / 3600000);
+        const remainingMillisecondsAfterHours = milliseconds % 3600000;
+
+        const minutes = Math.floor(remainingMillisecondsAfterHours / 60000);
+        const remainingMillisecondsAfterMinutes = remainingMillisecondsAfterHours % 60000;
+
+        const seconds = Math.floor(remainingMillisecondsAfterMinutes / 1000);
+        const remainingMilliseconds = remainingMillisecondsAfterMinutes % 1000;
+
+        const formattedHours = String(hours).padStart(2, '0');
+        const formattedMinutes = String(minutes).padStart(2, '0');
+        const formattedSeconds = String(seconds).padStart(2, '0');
+        const formattedMilliseconds = String(remainingMilliseconds).padStart(3, '0');
+
+        return `${formattedHours}:${formattedMinutes}:${formattedSeconds}:${formattedMilliseconds}`;
+    }
+
+    function validateTimeFormat(time) {
+        const regex = /^([0-1]?\d|2[0-3]):([0-5]?\d):([0-5]?\d):(\d{1,3})$/;
+
+        if (!regex.test(time)) {
+            return false;
+        }
+
+        const match = time.match(regex);
+
+        if (!match) {
+            return false;
+        }
+
+        const [, hours, minutes, seconds, milliseconds] = match;
+
+        return parseInt(milliseconds) % 100 === 0;
+    }
+
+    function timeToMilliseconds(time) {
+        if (!validateTimeFormat(time)) {
+            return null;
+        }
+
+        const [, hours, minutes, seconds, milliseconds] = time.match(/^([0-1]?\d|2[0-3]):([0-5]?\d):([0-5]?\d):(\d{1,3})$/);
+
+        return (parseInt(hours) * 60 * 60 * 1000 + parseInt(minutes) * 60 * 1000 + parseInt(seconds) * 1000 + parseInt(milliseconds));
+    }
+
+    // ==================== 時間範圍 UI 互動 ====================
+
+    function updatePercentage(rangeInput1, rangeInput2) {
+
+        let leftPercentage = rangeInput1 * 100;
+        let rightPercentage = 100 - rangeInput2 * 100;
+
+        if (leftPercentage > 90) {
+            leftPercentage -= 0.3;
+        }
+        if (rightPercentage > 90) {
+            rightPercentage -= 0.3;
+        }
+        range.style.left = leftPercentage + "%";
+        range.style.right = rightPercentage + "%";
     }
 
     function handleTimeChange(e) {
@@ -689,67 +793,6 @@
 
     }
 
-    function updatePercentage(rangeInput1, rangeInput2) {
-
-        let leftPercentage = rangeInput1 * 100;
-        let rightPercentage = 100 - rangeInput2 * 100;
-
-        if (leftPercentage > 90) {
-            leftPercentage -= 0.3;
-        }
-        if (rightPercentage > 90) {
-            rightPercentage -= 0.3;
-        }
-        range.style.left = leftPercentage + "%";
-        range.style.right = rightPercentage + "%";
-    }
-
-    function formatTime(milliseconds) {
-        const hours = Math.floor(milliseconds / 3600000);
-        const remainingMillisecondsAfterHours = milliseconds % 3600000;
-
-        const minutes = Math.floor(remainingMillisecondsAfterHours / 60000);
-        const remainingMillisecondsAfterMinutes = remainingMillisecondsAfterHours % 60000;
-
-        const seconds = Math.floor(remainingMillisecondsAfterMinutes / 1000);
-        const remainingMilliseconds = remainingMillisecondsAfterMinutes % 1000;
-
-        const formattedHours = String(hours).padStart(2, '0');
-        const formattedMinutes = String(minutes).padStart(2, '0');
-        const formattedSeconds = String(seconds).padStart(2, '0');
-        const formattedMilliseconds = String(remainingMilliseconds).padStart(3, '0');
-
-        return `${formattedHours}:${formattedMinutes}:${formattedSeconds}:${formattedMilliseconds}`;
-    }
-
-    function validateTimeFormat(time) {
-        const regex = /^([0-1]?\d|2[0-3]):([0-5]?\d):([0-5]?\d):(\d{1,3})$/;
-
-        if (!regex.test(time)) {
-            return false;
-        }
-
-        const match = time.match(regex);
-
-        if (!match) {
-            return false;
-        }
-
-        const [, hours, minutes, seconds, milliseconds] = match;
-
-        return parseInt(milliseconds) % 100 === 0;
-    }
-
-    function timeToMilliseconds(time) {
-        if (!validateTimeFormat(time)) {
-            return null;
-        }
-
-        const [, hours, minutes, seconds, milliseconds] = time.match(/^([0-1]?\d|2[0-3]):([0-5]?\d):([0-5]?\d):(\d{1,3})$/);
-
-        return (parseInt(hours) * 60 * 60 * 1000 + parseInt(minutes) * 60 * 1000 + parseInt(seconds) * 1000 + parseInt(milliseconds));
-    }
-
     function resetTime() {
         if (gifRenderingInProgress || isParsing) {
             showToast('正在處理中，請稍候', 'warning');
@@ -784,9 +827,382 @@
         updatePercentage(startMs / maxMs, endMs / maxMs);
     }
 
-    document.body.insertAdjacentHTML('beforeend', popupHTML);
+    // ==================== Popup 顯示/隱藏 ====================
 
-    const generateButton = document.getElementById('generateButton');
+    function showPopup() {
+        if (document.querySelector('.video-adHandler-background-blocker')) {
+            return;
+        }
+        if (!gifRenderingInProgress && !isParsing) {
+            syncTimeRangeToCurrentPlayback();
+        }
+        popup.style.display = 'flex';
+        window.scrollTo({
+            top: 0, behavior: 'smooth'
+        });
+    }
+
+    function closePopup() {
+        if (isParsing) {
+            return;
+        }
+        popup.style.display = 'none';
+    }
+
+    // ==================== 全域鍵盤快捷鍵 ====================
+
+    function handleGlobalKeydown(event) {
+        const activeElement = document.activeElement;
+        const isTyping = activeElement && (
+            ['INPUT', 'TEXTAREA'].includes(activeElement.tagName) || activeElement.isContentEditable
+        );
+
+        if (isTyping) {
+            return;
+        }
+
+        if (event.shiftKey && event.code === 'KeyG') {
+            showPopup();
+            return;
+        }
+
+        if (event.ctrlKey && event.shiftKey && event.code === 'KeyS') {
+            event.preventDefault();
+            captureScreenshot();
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            if (isParsing) {
+                cancelCapture();
+            } else {
+                closePopup();
+            }
+        }
+    }
+
+    // ==================== GIF 擷取 ====================
+
+    function captureFrames() {
+        if (!video) {
+            showToast('找不到影片播放器，無法擷取', 'error', 2200);
+            return;
+        }
+        if (!window.gifWorkerBlob) {
+            showToast('GIF 元件尚未準備完成，請稍候', 'warning', 2200);
+            return;
+        }
+        isParsing = true;
+        preCaptureCurrentTime = video.currentTime;
+
+        // 鎖定此次擷取的目標解析度；mid-flight 改下拉選單不會影響進行中的擷取
+        const selectedValue = resolutionSelect && resolutionSelect.value;
+        selectedResolution = selectedValue
+            ? videoResolutions.find(r => r.width === parseInt(selectedValue, 10)) || null
+            : null;
+
+        // 這個回調將每一幀都調用
+        function frameCallback(now, metadata) {
+            // 使用者按取消 → cancelCapture 會把 isParsing 設為 false，這裡直接跳出不再排下一幀
+            if (!isParsing) return;
+            // 確保捕捉只在設定的開始時間之後觸發
+            if (video.currentTime < startTime) {
+                //如果影片尚未達到開始捕捉的時間，則繼續等待
+                video.requestVideoFrameCallback(frameCallback);
+                return;
+            }
+            // 使用者指定的輸出解析度必須小於來源才降畫質；高過來源就忽略避免無謂 upscale
+            const useOverride = selectedResolution && selectedResolution.width < metadata.width;
+            const outWidth = useOverride ? selectedResolution.width : metadata.width;
+            const outHeight = useOverride ? selectedResolution.height : metadata.height;
+            currentWidth = outWidth;
+
+            // 每幀 new canvas 是為了讓 gif.js 以 copy:false 存 canvas reference，render 時才 readback
+            // （共用 canvas + 當下 readback 會和 video decoder 在 GPU 端互搶，導致 MEDIA_ERR_DECODE）
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = outWidth;
+            canvas.height = outHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const currentExpectedDisplayTime = metadata.mediaTime * 1000;
+
+            if (lastExpectedDisplayTime !== null) {
+                // 計算前一幀顯示時長
+                const displayDuration = currentExpectedDisplayTime - lastExpectedDisplayTime;
+                frameDisplayDurations.push(displayDuration);
+            }
+
+            // 更新上一幀的 expectedDisplayTime
+            lastExpectedDisplayTime = currentExpectedDisplayTime;
+
+            const gifInstance = getOrCreateGif(canvas.width, canvas.height);
+            if (!gifInstance) {
+                finalizeCapture({ render: false });
+                showToast(`目前不支援 ${canvas.width}px 解析度的 GIF 產生`, 'error', 2400);
+                return;
+            }
+
+            // 直接把 canvas 交給 gif.js（copy:false 預設），省下原版的 toDataURL + new Image 兩步
+            gifInstance.addFrame(canvas, { delay: 125 });
+            // 如果影片播放時間達到停止的時間，則停止捕捉
+            if (video.currentTime >= endTime || video.currentTime >= Math.floor(video.duration)) {
+                finalizeCapture({ render: true });
+                return;
+            }
+
+            const progress = (video.currentTime - startTime) / (endTime - startTime);
+            resolutionProgressElement.style.width = `${Math.round(progress * 100)}%`;
+            resolutionPercentage.textContent = `${Math.round(progress * 100)}%`;
+            // 持續捕捉每一幀
+            video.requestVideoFrameCallback(frameCallback);
+        }
+
+        // 等待影片達到開始捕捉的時間，然後開始捕捉
+        video.requestVideoFrameCallback(frameCallback);
+    }
+
+    function resetProgress() {
+        progressElement.style.width = `${0}%`; // 直接同步進度條
+        percentage.textContent = `${0}%`; // 更新百分比顯示
+        resolutionProgressElement.style.width = `${0}%`;
+        resolutionPercentage.textContent = `${0}%`;
+    }
+
+    // 擷取結束的單一入口：正常收尾 / 取消 / 不支援的解析度 都走這裡
+    // render=true 會觸發 gif 渲染；render=false 會丟棄已累積的影格並重置進度條
+    function finalizeCapture({ render, cancelled = false, seekBack = false }) {
+        if (!isParsing) return;
+        isParsing = false;
+        if (video) {
+            video.muted = false;
+            if (seekBack && preCaptureCurrentTime !== null) {
+                video.currentTime = preCaptureCurrentTime;
+            }
+        }
+        generateButton.textContent = '生成';
+
+        if (render) {
+            renderCapturedFrames(currentWidth);
+            return;
+        }
+
+        // 丟棄已累積但尚未 render 的影格（lazy init 可能還沒建 gif 實例，故需判空）
+        const gifInstance = window.gifList && window.gifList.get(currentWidth);
+        if (gifInstance && gifInstance.frames) gifInstance.frames = [];
+        frameDisplayDurations = [];
+        lastExpectedDisplayTime = null;
+        resetProgress();
+        if (cancelled) showToast('已取消擷取', 'warning', 1500);
+    }
+
+    // 純 render 邏輯，狀態清理已在 finalizeCapture 完成
+    function renderCapturedFrames(videoWidth) {
+        const gifInstance = window.gifList && window.gifList.get(videoWidth);
+        if (!gifInstance) {
+            showToast('GIF 產生器不存在，請重新整理頁面', 'error', 2200);
+            return;
+        }
+
+        if (!frameDisplayDurations.length || !gifInstance.frames.length) {
+            showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
+            return;
+        }
+
+        frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
+        const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
+        for (let i = 0; i < gifInstance.frames.length; i++) {
+            gifInstance.frames[i].delay = averageFrameDisplayDuration;
+        }
+        resolutionProgressElement.style.width = `${100}%`;
+        resolutionPercentage.textContent = `${100}%`;
+        gifInstance.render();
+        gifRenderingInProgress = true;
+        frameDisplayDurations = [];
+        lastExpectedDisplayTime = null;
+    }
+
+    function cancelCapture() {
+        finalizeCapture({ render: false, cancelled: true, seekBack: true });
+    }
+
+    // ==================== GIF 編碼器 + gif.js 載入 ====================
+
+    // 實際擷取到某解析度的第一幀才為它建 GIF 實例（lazy init），並快取在 window.gifList 供之後重用
+    // 原本啟動就預建 4 個實例 × 4 workers = 16 個 workers；實際每次只用一個解析度
+    // 需要 window.gifWorkerBlob 已載入（由 script.onload 的 fetch 填入）
+    function getOrCreateGif(width, height) {
+        if (window.gifList && window.gifList.has(width)) return window.gifList.get(width);
+        if (!window.gifWorkerBlob || !window.gifList) return null;
+        if (!videoResolutions.some(r => r.width === width)) return null;
+
+        const gif = new GIF({
+            workers: 4,
+            workerScript: URL.createObjectURL(window.gifWorkerBlob),
+            quality: 0,
+            repeat: 0,
+            width,
+            height,
+            background: '#ffffff'
+        });
+
+        gif.on('finished', function (blob) {
+            const gifUrl = URL.createObjectURL(blob);
+            const displayStartTime = formatTime(startTime * 1000);
+            const displayEndTime = formatTime(endTime * 1000);
+            const titleMatch = document.title.match(/(.+?\[\d+\])/);
+            const fileName = titleMatch
+                ? titleMatch[0] + ' ' + displayStartTime + '-' + displayEndTime
+                : displayStartTime + '-' + displayEndTime;
+
+            // data-object-url 讓刪除卡片時可以 revokeObjectURL，避免 blob 在 session 內累積
+            const cardHTML = `
+                <div class="card" data-object-url="${gifUrl}">
+                    <div class="image_container">
+                        <img class="image" src="${gifUrl}" alt="Image Description" />
+                    </div>
+                    <div class="title">
+                         <span>${displayStartTime} - ${displayEndTime}</span>
+                     </div>
+                    <a href="${gifUrl}" download="${fileName}">
+                        <button class="cart-button">
+                             <span>下載</span>
+                        </button>
+                    </a>
+                    <a id="delete-a">
+                    <button class="cart-button"">
+                        <span>刪除</span>
+                    </button>
+                    </a>
+                </div>
+            `;
+
+            imgsContainer.insertAdjacentHTML('beforeend', cardHTML);
+
+            gif.abort();
+            gif.frames = [];
+            gifRenderingInProgress = false;
+            if (imgsContainer.querySelectorAll('.card').length >= 3) {
+                imgsContainer.classList.add('image-container-override');
+                imgsContainer.scrollLeft = imgsContainer.scrollWidth;
+            }
+        });
+
+        gif.on('progress', function (progress) {
+            progressElement.style.width = `${Math.round(progress * 100)}%`;
+            percentage.textContent = `${Math.round(progress * 100)}%`;
+        });
+
+        window.gifList.set(width, gif);
+        return gif;
+    }
+
+    // 動態創建 <script> 元素並加載 gif.js
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.min.js';
+    document.head.appendChild(script);
+
+    // 等待 gif.js 加載完成
+    script.onload = function () {
+        // 檢查 GIF 類是否可用
+        window.gifList = new Map();
+        if (typeof GIF !== 'undefined') {
+            // render 階段 gif.js 會對 360+ 幀做 drawImage+getImageData，若內部 canvas 是 GPU-backed
+            // 會觸發連續 GPU→CPU readback，跟 video decoder 搶 GPU 管線 → 觸發 MEDIA_ERR_DECODE。
+            // 預先讓 gif.js 的內部 canvas 走 willReadFrequently（CPU-backed），readback 在 CPU 側完成
+            if (GIF.prototype && typeof GIF.prototype.getImageData === 'function') {
+                const origGetImageData = GIF.prototype.getImageData;
+                GIF.prototype.getImageData = function (image) {
+                    if (!this._canvas) {
+                        this._canvas = document.createElement('canvas');
+                        this._canvas.width = image.width;
+                        this._canvas.height = image.height;
+                        this._canvas.getContext('2d', { willReadFrequently: true });
+                    }
+                    return origGetImageData.call(this, image);
+                };
+            }
+
+            // 只先載 worker blob；GIF 實例改由 getOrCreateGif 在真正擷取時 lazy 建立
+            fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Network response was not OK");
+                    }
+                    return response.blob();
+                })
+                .then(workerBlob => {
+                    window.gifWorkerBlob = workerBlob;
+                })
+                .catch(error => {
+                    console.error("Error loading GIF worker:", error);
+                    showToast('GIF 元件載入失敗，請稍後再試', 'error', 2200);
+                });
+
+        } else {
+            console.log('Failed to find GIF class!');
+            showToast('GIF 元件初始化失敗', 'error', 2200);
+        }
+    };
+
+    // ==================== 截圖 ====================
+
+    function captureScreenshot() {
+        const video = document.getElementById('ani_video_html5_api');
+        if (!video) {
+            showToast('找不到影片播放器，無法截圖', 'error', 2200);
+            return;
+        }
+        if (!imgsContainer) {
+            showToast('找不到結果區塊，無法顯示截圖', 'error', 2200);
+            return;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // 轉換為圖片位址
+        const imgUrl = canvas.toDataURL('image/png');
+        const currentTime = formatTime(video.currentTime * 1000);
+
+        // 檔名處理
+        let titleMatch = document.title.match(/(.+?\[\d+\])/);
+        let fileName = titleMatch ? `${titleMatch[0]} ${currentTime}.png` : `Screenshot_${currentTime}.png`;
+
+        // 建立結果卡片 (沿用你的 Card 樣式)
+        const cardHTML = `
+            <div class="card">
+                <div class="image_container">
+                    <img class="image" src="${imgUrl}" />
+                </div>
+                <div class="title">
+                     <span>截圖：${currentTime}</span>
+                 </div>
+                <a href="${imgUrl}" download="${fileName}">
+                    <button class="cart-button"><span>下載截圖</span></button>
+                </a>
+                <a id="delete-a">
+                    <button class="cart-button"><span>刪除</span></button>
+                </a>
+            </div>
+        `;
+
+        imgsContainer.insertAdjacentHTML('beforeend', cardHTML);
+
+        // 自動捲動
+        if (imgsContainer.querySelectorAll('.card').length >= 3) {
+            imgsContainer.classList.add('image-container-override');
+            imgsContainer.scrollLeft = imgsContainer.scrollWidth;
+        }
+
+        // --- 靜態通知邏輯 ---
+        showToast(`截圖已儲存 (${currentTime})`);
+    }
+
+    // ==================== 事件綁定 ====================
 
     // 關閉按鈕事件
     document.getElementById('closePopupBtn').addEventListener('click', closePopup);
@@ -820,70 +1236,37 @@
         }
     });
 
-    const popup = document.getElementById('popup');
-
-    const progressElement = document.getElementById('progress');
-    const percentage = document.getElementById('percentage');
-    const resolutionProgressElement = document.getElementById('resolutionProgress');
-    const resolutionPercentage = document.getElementById('resolutionPercentage');
-    const resolutionSelect = document.getElementById('resolutionSelect');
-    let isParsing = false;
-
-    function showPopup() {
-        if (document.querySelector('.video-adHandler-background-blocker')) {
-            return;
-        }
-        if (!gifRenderingInProgress && !isParsing) {
-            syncTimeRangeToCurrentPlayback();
-        }
-        popup.style.display = 'flex';
-        window.scrollTo({
-            top: 0, behavior: 'smooth'
-        });
-    }
-
-    function closePopup() {
-        if (isParsing) {
-            return;
-        }
-        popup.style.display = 'none';
-    }
-
-
-    function handleGlobalKeydown(event) {
-        const activeElement = document.activeElement;
-        const isTyping = activeElement && (
-            ['INPUT', 'TEXTAREA'].includes(activeElement.tagName) || activeElement.isContentEditable
-        );
-
-        if (isTyping) {
-            return;
-        }
-
-        if (event.shiftKey && event.code === 'KeyG') {
-            showPopup();
-            return;
-        }
-
-        if (event.ctrlKey && event.shiftKey && event.code === 'KeyS') {
-            event.preventDefault();
-            captureScreenshot();
-            return;
-        }
-
-        if (event.key === 'Escape') {
-            if (isParsing) {
-                cancelCapture();
-            } else {
-                closePopup();
-            }
-        }
-    }
+    document.getElementById('screenshotButton').addEventListener('click', captureScreenshot);
 
     document.addEventListener('keydown', handleGlobalKeydown);
 
+    if (video) {
+        video.addEventListener('loadedmetadata', () => {
+            if (rangeInput && rangeInput.length) {
+                rangeInput.forEach((input) => {
+                    input.max = Math.floor(video.duration) * 1000;
+                });
+                updatePercentage(rangeInput[0].value / rangeInput[0].max, rangeInput[1].value / rangeInput[1].max);
+            }
+        });
+        video.addEventListener('ended', () => {
+            // 只在還在擷取中才收尾；避免使用者沒點「生成」就看完影片還觸發一次 render
+            if (!isParsing) return;
+            finalizeCapture({ render: true });
+        });
+    } else {
+        console.error('找不到影片元素 #ani_video_html5_api');
+        showToast('找不到影片播放器，部分功能將無法使用', 'error', 2600);
+    }
+
+    // ==================== 初始化（window.onload） ====================
+
     window.onload = function () {
-        rangeInput = document.querySelectorAll(".range-input input"), timeInput = document.querySelectorAll(".price-input input"), range = document.querySelector(".slider .progress"), imgsContainer = document.querySelector('.imgs-container'), resetButton = document.querySelector('#reset-btn');
+        rangeInput = document.querySelectorAll(".range-input input");
+        timeInput = document.querySelectorAll(".price-input input");
+        range = document.querySelector(".slider .progress");
+        imgsContainer = document.querySelector('.imgs-container');
+        resetButton = document.querySelector('#reset-btn');
         if (!rangeInput.length || !timeInput.length || !range || !imgsContainer || !resetButton) {
             showToast('工具初始化失敗，請重新整理頁面', 'error', 2200);
             return;
@@ -979,363 +1362,5 @@
         });
 
     };
-
-    // 動態創建 <script> 元素並加載 gif.js
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.min.js';
-    document.head.appendChild(script);
-    const videoResolutions = [{width: 1920, height: 1080, label: "1080p"}, {
-        width: 1280,
-        height: 720,
-        label: "720p"
-    }, {width: 960, height: 540, label: "540p"}, {width: 640, height: 360, label: "360p"}];
-
-    // 實際擷取到某解析度的第一幀才為它建 GIF 實例（lazy init），並快取在 window.gifList 供之後重用
-    // 原本啟動就預建 4 個實例 × 4 workers = 16 個 workers；實際每次只用一個解析度
-    // 需要 window.gifWorkerBlob 已載入（由 script.onload 的 fetch 填入）
-    function getOrCreateGif(width, height) {
-        if (window.gifList && window.gifList.has(width)) return window.gifList.get(width);
-        if (!window.gifWorkerBlob || !window.gifList) return null;
-        if (!videoResolutions.some(r => r.width === width)) return null;
-
-        const gif = new GIF({
-            workers: 4,
-            workerScript: URL.createObjectURL(window.gifWorkerBlob),
-            quality: 0,
-            repeat: 0,
-            width,
-            height,
-            background: '#ffffff'
-        });
-
-        gif.on('finished', function (blob) {
-            const gifUrl = URL.createObjectURL(blob);
-            const displayStartTime = formatTime(startTime * 1000);
-            const displayEndTime = formatTime(endTime * 1000);
-            const titleMatch = document.title.match(/(.+?\[\d+\])/);
-            const fileName = titleMatch
-                ? titleMatch[0] + ' ' + displayStartTime + '-' + displayEndTime
-                : displayStartTime + '-' + displayEndTime;
-
-            // data-object-url 讓刪除卡片時可以 revokeObjectURL，避免 blob 在 session 內累積
-            const cardHTML = `
-                <div class="card" data-object-url="${gifUrl}">
-                    <div class="image_container">
-                        <img class="image" src="${gifUrl}" alt="Image Description" />
-                    </div>
-                    <div class="title">
-                         <span>${displayStartTime} - ${displayEndTime}</span>
-                     </div>
-                    <a href="${gifUrl}" download="${fileName}">
-                        <button class="cart-button">
-                             <span>下載</span>
-                        </button>
-                    </a>
-                    <a id="delete-a">
-                    <button class="cart-button"">
-                        <span>刪除</span>
-                    </button>
-                    </a>
-                </div>
-            `;
-
-            imgsContainer.insertAdjacentHTML('beforeend', cardHTML);
-
-            gif.abort();
-            gif.frames = [];
-            gifRenderingInProgress = false;
-            if (imgsContainer.querySelectorAll('.card').length >= 3) {
-                imgsContainer.classList.add('image-container-override');
-                imgsContainer.scrollLeft = imgsContainer.scrollWidth;
-            }
-        });
-
-        gif.on('progress', function (progress) {
-            progressElement.style.width = `${Math.round(progress * 100)}%`;
-            percentage.textContent = `${Math.round(progress * 100)}%`;
-        });
-
-        window.gifList.set(width, gif);
-        return gif;
-    }
-
-    const video = document.getElementById('ani_video_html5_api');
-    let videoDuration = 1420;
-
-    if (video) {
-        video.addEventListener('loadedmetadata', () => {
-            if (rangeInput && rangeInput.length) {
-                rangeInput.forEach((input) => {
-                    input.max = Math.floor(video.duration) * 1000;
-                });
-                updatePercentage(rangeInput[0].value / rangeInput[0].max, rangeInput[1].value / rangeInput[1].max);
-            }
-        });
-    } else {
-        console.error('找不到影片元素 #ani_video_html5_api');
-        showToast('找不到影片播放器，部分功能將無法使用', 'error', 2600);
-    }
-
-    // 等待 gif.js 加載完成
-    script.onload = function () {
-        // 檢查 GIF 類是否可用
-        window.gifList = new Map();
-        if (typeof GIF !== 'undefined') {
-            // render 階段 gif.js 會對 360+ 幀做 drawImage+getImageData，若內部 canvas 是 GPU-backed
-            // 會觸發連續 GPU→CPU readback，跟 video decoder 搶 GPU 管線 → 觸發 MEDIA_ERR_DECODE。
-            // 預先讓 gif.js 的內部 canvas 走 willReadFrequently（CPU-backed），readback 在 CPU 側完成
-            if (GIF.prototype && typeof GIF.prototype.getImageData === 'function') {
-                const origGetImageData = GIF.prototype.getImageData;
-                GIF.prototype.getImageData = function (image) {
-                    if (!this._canvas) {
-                        this._canvas = document.createElement('canvas');
-                        this._canvas.width = image.width;
-                        this._canvas.height = image.height;
-                        this._canvas.getContext('2d', { willReadFrequently: true });
-                    }
-                    return origGetImageData.call(this, image);
-                };
-            }
-
-            // 只先載 worker blob；GIF 實例改由 getOrCreateGif 在真正擷取時 lazy 建立
-            fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
-                .then((response) => {
-                    if (!response.ok) {
-                        throw new Error("Network response was not OK");
-                    }
-                    return response.blob();
-                })
-                .then(workerBlob => {
-                    window.gifWorkerBlob = workerBlob;
-                })
-                .catch(error => {
-                    console.error("Error loading GIF worker:", error);
-                    showToast('GIF 元件載入失敗，請稍後再試', 'error', 2200);
-                });
-
-        } else {
-            console.log('Failed to find GIF class!');
-            showToast('GIF 元件初始化失敗', 'error', 2200);
-        }
-    };
-
-    let startTime = 0;
-    let endTime = 15;
-    let gifRenderingInProgress = false; // 用來標記是否正在進行渲染
-    let lastExpectedDisplayTime = null;
-    let frameDisplayDurations = [];
-    let currentWidth = 1920;
-    let preCaptureCurrentTime = null; // 擷取開始時的播放位置，取消時用來 seek 回去
-    let selectedResolution = null; // 使用者在下拉選單指定的輸出解析度；null = 跟隨來源
-
-    function captureFrames() {
-        if (!video) {
-            showToast('找不到影片播放器，無法擷取', 'error', 2200);
-            return;
-        }
-        if (!window.gifWorkerBlob) {
-            showToast('GIF 元件尚未準備完成，請稍候', 'warning', 2200);
-            return;
-        }
-        isParsing = true;
-        preCaptureCurrentTime = video.currentTime;
-
-        // 鎖定此次擷取的目標解析度；mid-flight 改下拉選單不會影響進行中的擷取
-        const selectedValue = resolutionSelect && resolutionSelect.value;
-        selectedResolution = selectedValue
-            ? videoResolutions.find(r => r.width === parseInt(selectedValue, 10)) || null
-            : null;
-
-        // 這個回調將每一幀都調用
-        function frameCallback(now, metadata) {
-            // 使用者按取消 → cancelCapture 會把 isParsing 設為 false，這裡直接跳出不再排下一幀
-            if (!isParsing) return;
-            // 確保捕捉只在設定的開始時間之後觸發
-            if (video.currentTime < startTime) {
-                //如果影片尚未達到開始捕捉的時間，則繼續等待
-                video.requestVideoFrameCallback(frameCallback);
-                return;
-            }
-            // 使用者指定的輸出解析度必須小於來源才降畫質；高過來源就忽略避免無謂 upscale
-            const useOverride = selectedResolution && selectedResolution.width < metadata.width;
-            const outWidth = useOverride ? selectedResolution.width : metadata.width;
-            const outHeight = useOverride ? selectedResolution.height : metadata.height;
-            currentWidth = outWidth;
-
-            // 每幀 new canvas 是為了讓 gif.js 以 copy:false 存 canvas reference，render 時才 readback
-            // （共用 canvas + 當下 readback 會和 video decoder 在 GPU 端互搶，導致 MEDIA_ERR_DECODE）
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = outWidth;
-            canvas.height = outHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const currentExpectedDisplayTime = metadata.mediaTime * 1000;
-
-            if (lastExpectedDisplayTime !== null) {
-                // 計算前一幀顯示時長
-                const displayDuration = currentExpectedDisplayTime - lastExpectedDisplayTime;
-                frameDisplayDurations.push(displayDuration);
-            }
-
-            // 更新上一幀的 expectedDisplayTime
-            lastExpectedDisplayTime = currentExpectedDisplayTime;
-
-            const gifInstance = getOrCreateGif(canvas.width, canvas.height);
-            if (!gifInstance) {
-                finalizeCapture({ render: false });
-                showToast(`目前不支援 ${canvas.width}px 解析度的 GIF 產生`, 'error', 2400);
-                return;
-            }
-
-            // 直接把 canvas 交給 gif.js（copy:false 預設），省下原版的 toDataURL + new Image 兩步
-            gifInstance.addFrame(canvas, { delay: 125 });
-            // 如果影片播放時間達到停止的時間，則停止捕捉
-            if (video.currentTime >= endTime || video.currentTime >= Math.floor(video.duration)) {
-                finalizeCapture({ render: true });
-                return;
-            }
-
-            const progress = (video.currentTime - startTime) / (endTime - startTime);
-            resolutionProgressElement.style.width = `${Math.round(progress * 100)}%`;
-            resolutionPercentage.textContent = `${Math.round(progress * 100)}%`;
-            // 持續捕捉每一幀
-            video.requestVideoFrameCallback(frameCallback);
-        }
-
-        // 等待影片達到開始捕捉的時間，然後開始捕捉
-        video.requestVideoFrameCallback(frameCallback);
-    }
-
-    function resetProgress() {
-        progressElement.style.width = `${0}%`; // 直接同步進度條
-        percentage.textContent = `${0}%`; // 更新百分比顯示
-        resolutionProgressElement.style.width = `${0}%`;
-        resolutionPercentage.textContent = `${0}%`;
-    }
-
-    if (video) {
-        video.addEventListener('ended', () => {
-            // 只在還在擷取中才收尾；避免使用者沒點「生成」就看完影片還觸發一次 render
-            if (!isParsing) return;
-            finalizeCapture({ render: true });
-        });
-    }
-
-    // 擷取結束的單一入口：正常收尾 / 取消 / 不支援的解析度 都走這裡
-    // render=true 會觸發 gif 渲染；render=false 會丟棄已累積的影格並重置進度條
-    function finalizeCapture({ render, cancelled = false, seekBack = false }) {
-        if (!isParsing) return;
-        isParsing = false;
-        if (video) {
-            video.muted = false;
-            if (seekBack && preCaptureCurrentTime !== null) {
-                video.currentTime = preCaptureCurrentTime;
-            }
-        }
-        generateButton.textContent = '生成';
-
-        if (render) {
-            renderCapturedFrames(currentWidth);
-            return;
-        }
-
-        // 丟棄已累積但尚未 render 的影格（lazy init 可能還沒建 gif 實例，故需判空）
-        const gifInstance = window.gifList && window.gifList.get(currentWidth);
-        if (gifInstance && gifInstance.frames) gifInstance.frames = [];
-        frameDisplayDurations = [];
-        lastExpectedDisplayTime = null;
-        resetProgress();
-        if (cancelled) showToast('已取消擷取', 'warning', 1500);
-    }
-
-    // 純 render 邏輯，狀態清理已在 finalizeCapture 完成
-    function renderCapturedFrames(videoWidth) {
-        const gifInstance = window.gifList && window.gifList.get(videoWidth);
-        if (!gifInstance) {
-            showToast('GIF 產生器不存在，請重新整理頁面', 'error', 2200);
-            return;
-        }
-
-        if (!frameDisplayDurations.length || !gifInstance.frames.length) {
-            showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
-            return;
-        }
-
-        frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
-        const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
-        for (let i = 0; i < gifInstance.frames.length; i++) {
-            gifInstance.frames[i].delay = averageFrameDisplayDuration;
-        }
-        resolutionProgressElement.style.width = `${100}%`;
-        resolutionPercentage.textContent = `${100}%`;
-        gifInstance.render();
-        gifRenderingInProgress = true;
-        frameDisplayDurations = [];
-        lastExpectedDisplayTime = null;
-    }
-
-    function cancelCapture() {
-        finalizeCapture({ render: false, cancelled: true, seekBack: true });
-    }
-
-    // ========= 截圖功能相關 =========
-
-    function captureScreenshot() {
-        const video = document.getElementById('ani_video_html5_api');
-        if (!video) {
-            showToast('找不到影片播放器，無法截圖', 'error', 2200);
-            return;
-        }
-        if (!imgsContainer) {
-            showToast('找不到結果區塊，無法顯示截圖', 'error', 2200);
-            return;
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // 轉換為圖片位址
-        const imgUrl = canvas.toDataURL('image/png');
-        const currentTime = formatTime(video.currentTime * 1000);
-
-        // 檔名處理
-        let titleMatch = document.title.match(/(.+?\[\d+\])/);
-        let fileName = titleMatch ? `${titleMatch[0]} ${currentTime}.png` : `Screenshot_${currentTime}.png`;
-
-        // 建立結果卡片 (沿用你的 Card 樣式)
-        const cardHTML = `
-            <div class="card">
-                <div class="image_container">
-                    <img class="image" src="${imgUrl}" />
-                </div>
-                <div class="title">
-                     <span>截圖：${currentTime}</span>
-                 </div>
-                <a href="${imgUrl}" download="${fileName}">
-                    <button class="cart-button"><span>下載截圖</span></button>
-                </a>
-                <a id="delete-a">
-                    <button class="cart-button"><span>刪除</span></button>
-                </a>
-            </div>
-        `;
-
-        imgsContainer.insertAdjacentHTML('beforeend', cardHTML);
-
-        // 自動捲動
-        if (imgsContainer.querySelectorAll('.card').length >= 3) {
-            imgsContainer.classList.add('image-container-override');
-            imgsContainer.scrollLeft = imgsContainer.scrollWidth;
-        }
-
-        // --- 靜態通知邏輯 ---
-        showToast(`截圖已儲存 (${currentTime})`);
-    }
-
-    document.getElementById('screenshotButton').addEventListener('click', captureScreenshot);
 
 })();
