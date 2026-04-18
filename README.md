@@ -27,7 +27,6 @@
 ```
 repo-root/
 ├── README.md                    # 本檔（索引）
-├── CLAUDE.md                    # AI 協作指引
 └── scripts/
     └── <script-name>/
         ├── README.md            # 該腳本的使用說明
