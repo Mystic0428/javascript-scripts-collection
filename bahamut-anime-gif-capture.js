@@ -321,14 +321,6 @@
             outline-offset: 2px;
         }
 
-        input[type="range"].range-max::-webkit-slider-thumb {
-            background: #000;
-        }
-
-        input[type="range"].range-max::-moz-range-thumb {
-            background: #000;
-        }
-
         @media (prefers-reduced-motion: reduce) {
             .slider-tooltip,
             input[type="range"]::-webkit-slider-thumb,
