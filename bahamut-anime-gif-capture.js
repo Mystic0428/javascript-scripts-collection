@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.7
+// @version      1.8
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -1147,9 +1147,7 @@
 
             const gifInstance = getOrCreateGif(canvas.width, canvas.height);
             if (!gifInstance) {
-                isParsing = false;
-                video.muted = false;
-                generateButton.textContent = '生成';
+                finalizeCapture({ render: false });
                 showToast(`目前不支援 ${canvas.width}px 解析度的 GIF 產生`, 'error', 2400);
                 return;
             }
@@ -1158,7 +1156,7 @@
             gifInstance.addFrame(canvas, { delay: 125 });
             // 如果影片播放時間達到停止的時間，則停止捕捉
             if (video.currentTime >= endTime || video.currentTime >= Math.floor(video.duration)) {
-                generateGif(canvas.width);
+                finalizeCapture({ render: true });
                 return;
             }
 
@@ -1182,42 +1180,54 @@
 
     if (video) {
         video.addEventListener('ended', () => {
-            const gifInstance = window.gifList && window.gifList.get(currentWidth);
-            if (gifInstance && !gifInstance.running) {
-                generateGif(currentWidth);
-            }
+            // 只在還在擷取中才收尾；避免使用者沒點「生成」就看完影片還觸發一次 render
+            if (!isParsing) return;
+            finalizeCapture({ render: true });
         });
     }
 
-    function generateGif(videoWidth) {
+    // 擷取結束的單一入口：正常收尾 / 取消 / 不支援的解析度 都走這裡
+    // render=true 會觸發 gif 渲染；render=false 會丟棄已累積的影格並重置進度條
+    function finalizeCapture({ render, cancelled = false, seekBack = false }) {
+        if (!isParsing) return;
+        isParsing = false;
+        if (video) {
+            video.muted = false;
+            if (seekBack && preCaptureCurrentTime !== null) {
+                video.currentTime = preCaptureCurrentTime;
+            }
+        }
+        generateButton.textContent = '生成';
+
+        if (render) {
+            renderCapturedFrames(currentWidth);
+            return;
+        }
+
+        // 丟棄已累積但尚未 render 的影格（lazy init 可能還沒建 gif 實例，故需判空）
+        const gifInstance = window.gifList && window.gifList.get(currentWidth);
+        if (gifInstance && gifInstance.frames) gifInstance.frames = [];
+        frameDisplayDurations = [];
+        lastExpectedDisplayTime = null;
+        resetProgress();
+        if (cancelled) showToast('已取消擷取', 'warning', 1500);
+    }
+
+    // 純 render 邏輯，狀態清理已在 finalizeCapture 完成
+    function renderCapturedFrames(videoWidth) {
         const gifInstance = window.gifList && window.gifList.get(videoWidth);
         if (!gifInstance) {
-            isParsing = false;
-            gifRenderingInProgress = false;
-            if (video) {
-                video.muted = false;
-            }
-            generateButton.textContent = '生成';
             showToast('GIF 產生器不存在，請重新整理頁面', 'error', 2200);
             return;
         }
 
         if (!frameDisplayDurations.length || !gifInstance.frames.length) {
-            isParsing = false;
-            gifRenderingInProgress = false;
-            if (video) {
-                video.muted = false;
-            }
-            generateButton.textContent = '生成';
             showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
             return;
         }
 
         frameDisplayDurations.push(frameDisplayDurations[frameDisplayDurations.length - 1]);
         const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
-        video.muted = false;
-        isParsing = false;
-        generateButton.textContent = '生成';
         for (let i = 0; i < gifInstance.frames.length; i++) {
             gifInstance.frames[i].delay = averageFrameDisplayDuration;
         }
@@ -1230,21 +1240,7 @@
     }
 
     function cancelCapture() {
-        if (!isParsing) return;
-        isParsing = false;
-        if (video) {
-            video.muted = false;
-            // 把播放位置拉回使用者按「生成」當下的時間；不然 video 會停在擷取結束的位置
-            if (preCaptureCurrentTime !== null) video.currentTime = preCaptureCurrentTime;
-        }
-        // 清掉已累積但尚未 render 的影格（lazy init 可能還沒建 gif 實例，故需判空）
-        const gifInstance = window.gifList && window.gifList.get(currentWidth);
-        if (gifInstance && gifInstance.frames) gifInstance.frames = [];
-        frameDisplayDurations = [];
-        lastExpectedDisplayTime = null;
-        resetProgress();
-        generateButton.textContent = '生成';
-        showToast('已取消擷取', 'warning', 1500);
+        finalizeCapture({ render: false, cancelled: true, seekBack: true });
     }
 
     // ========= 截圖功能相關 =========
