@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.12
+// @version      1.13
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -37,6 +37,16 @@
             --bg-color: #fff;
             --bg-color-alt: #666;
             --main-color: #323232;
+
+            --radius-sm: 5px;
+            --radius-md: 10px;
+
+            --text-xs: 12px;
+            --text-sm: 14px;
+            --text-base: 15px;
+            --text-md: 17px;
+            --text-lg: 19px;
+            --text-xl: 24px;
         }
 
         .flip-card__popup {
@@ -55,7 +65,7 @@
             justify-content: flex-start;
             background: lightgrey;
             gap: 20px;
-            border-radius: 5px;
+            border-radius: var(--radius-sm);
             border: 2px solid var(--main-color);
             box-shadow: 4px 4px var(--main-color);
             backface-visibility: hidden;
@@ -73,11 +83,11 @@
         .flip-card__input {
             width: 250px;
             height: 40px;
-            border-radius: 5px;
+            border-radius: var(--radius-sm);
             border: 2px solid var(--main-color);
             background-color: var(--bg-color);
             box-shadow: 4px 4px var(--main-color);
-            font-size: 15px;
+            font-size: var(--text-base);
             font-weight: 600;
             color: var(--font-color);
             padding: 5px 10px;
@@ -97,14 +107,24 @@
             margin: 20px 0 0;
             width: 120px;
             height: 40px;
-            border-radius: 5px;
+            border-radius: var(--radius-sm);
             border: 2px solid var(--main-color);
             background-color: var(--bg-color);
             box-shadow: 4px 4px var(--main-color);
-            font-size: 17px;
+            font-size: var(--text-md);
             font-weight: 600;
             color: var(--font-color);
             cursor: pointer;
+        }
+
+        .flip-card__btn--primary {
+            background-color: var(--main-color);
+            color: var(--bg-color);
+        }
+
+        .flip-card__btn--ghost {
+            background-color: transparent;
+            color: var(--font-color-sub);
         }
 
         .modal__header {
@@ -119,7 +139,7 @@
         }
 
         .modal__title {
-            font-size: 25px;
+            font-size: var(--text-xl);
             font-weight: 900;
             color: var(--main-color);
             flex-grow: 1;
@@ -144,7 +164,7 @@
         }
 
         .range-wrapper {
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             padding: 5px 25px 40px;
             box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1);
         }
@@ -152,7 +172,7 @@
         .range-wrapper h2,
         .range-wrapper span {
             font-weight: 900;
-            font-size: 15.5px;
+            font-size: var(--text-base);
         }
 
         .price-input {
@@ -172,9 +192,9 @@
             width: 100%;
             height: 100%;
             outline: none;
-            font-size: 19px;
+            font-size: var(--text-lg);
             margin-left: 12px;
-            border-radius: 5px;
+            border-radius: var(--radius-sm);
             text-align: center;
             border: 1px solid #999;
             -moz-appearance: textfield;
@@ -188,7 +208,7 @@
         .price-input .separator {
             width: 130px;
             display: flex;
-            font-size: 19px;
+            font-size: var(--text-lg);
             align-items: center;
             justify-content: center;
         }
@@ -222,7 +242,7 @@
             box-shadow: 2px 2px 0 0 #000;
             padding: 3px 8px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: var(--text-xs);
             font-weight: 700;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
@@ -441,7 +461,7 @@
 
         .imgs-container::-webkit-scrollbar-track {
             -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             background-color: #F5F5F5;
         }
 
@@ -450,7 +470,7 @@
         }
 
         .imgs-container::-webkit-scrollbar-thumb {
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, .3);
             background-color: #555;
         }
@@ -468,14 +488,14 @@
             flex-direction: column;
             align-items: center;
             box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
+            border-radius: var(--radius-md);
         }
 
         #progressBar {
             width: 40%;
             height: 25px;
             background-color: #e0e0e0;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             position: relative;
             overflow: hidden;
         }
@@ -484,11 +504,11 @@
             height: 100%;
             background-color: #568358;
             width: 0%;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
         }
 
         #percentage {
-            font-size: 14px;
+            font-size: var(--text-sm);
             color: #333;
             position: absolute;
             left: 50%;
@@ -501,7 +521,7 @@
             width: 40%;
             height: 25px;
             background-color: #e0e0e0;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
             position: relative;
             overflow: hidden;
             margin-right: 40px;
@@ -511,11 +531,11 @@
             height: 100%;
             background-color: #6e8f8f;
             width: 0%;
-            border-radius: 10px;
+            border-radius: var(--radius-md);
         }
 
         #resolutionPercentage {
-            font-size: 14px;
+            font-size: var(--text-sm);
             color: #333;
             position: absolute;
             left: 50%;
@@ -535,12 +555,12 @@
         .resolution-select {
             width: 140px;
             height: 32px;
-            font-size: 14px;
+            font-size: var(--text-sm);
         }
 
         .progress-text {
             font-weight: 600;
-            font-size: 19px;
+            font-size: var(--text-lg);
         }
 
         .form-title {
@@ -550,7 +570,7 @@
 
         .form-title h2{
            font-weight: 900;
-           font-size: 24px;
+           font-size: var(--text-xl);
         }
         .image-container-override {
            justify-content: normal;
@@ -558,7 +578,7 @@
 
         .tool-section {
            background: rgba(0, 0, 0, 0.05);
-           border-radius: 10px;
+           border-radius: var(--radius-md);
            padding: 15px;
            margin-bottom: 20px;
            border: 1px solid #ccc;
@@ -570,9 +590,7 @@
            font-weight: 900;
            color: #555;
            margin-bottom: 10px;
-           font-size: 24px;
-           text-transform: uppercase;
-           letter-spacing: 1px;
+           font-size: var(--text-xl);
         }
 
         .screenshot-btn-main {
@@ -581,7 +599,7 @@
            width: 100% !important;
            max-width: 400px;
            height: 50px !important;
-           font-size: 18px !important;
+           font-size: var(--text-md) !important;
            transition: transform 0.1s;
         }
 
@@ -632,8 +650,8 @@
     <div class="wrapper flip-card__popup" id="popup">
         <div class="modal__header">
             <span class="modal__title">動畫瘋GIF截圖工具</span>
-            <button class="close-button close-button--icon" id="closePopupBtn">
-                <svg width="24" viewBox="0 0 24 24" height="24" xmlns="http://www.w3.org/2000/svg">
+            <button class="close-button close-button--icon" id="closePopupBtn" aria-label="關閉">
+                <svg width="24" viewBox="0 0 24 24" height="24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
                     <path fill="none" d="M0 0h24v24H0V0z"></path>
                     <path
                         d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z">
@@ -696,8 +714,8 @@
                         </select>
                     </div>
                     <div class="control-btn">
-                        <button type="button" class="flip-card__btn" id="generateButton">生成</button>
-                        <button type="button" class="flip-card__btn" id="reset-btn">重置</button>
+                        <button type="button" class="flip-card__btn flip-card__btn--primary" id="generateButton">生成</button>
+                        <button type="button" class="flip-card__btn flip-card__btn--ghost" id="reset-btn">重置</button>
                         <button type="button" class="flip-card__btn" id="syncToCurrentBtn" title="把範圍起點設成目前影片時間">跳到目前時間</button>
                     </div>
                 </div>
@@ -1186,7 +1204,7 @@
                         </button>
                     </a>
                     <a id="delete-a">
-                    <button class="cart-button"">
+                    <button class="cart-button">
                         <span>刪除</span>
                     </button>
                     </a>
