@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.4
+// @version      1.5
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -924,6 +924,9 @@
             if (e.target.closest('#delete-a')) {
                 const card = e.target.closest('.card');
                 if (card) {
+                    // 釋放 GIF 的 object URL（截圖走 dataURL 沒這個屬性，不會觸發）
+                    const objectUrl = card.dataset.objectUrl;
+                    if (objectUrl) URL.revokeObjectURL(objectUrl);
                     card.remove();
                 }
                 if (imgsContainer.querySelectorAll('.card').length < 3) {
@@ -947,6 +950,75 @@
         height: 720,
         label: "720p"
     }, {width: 960, height: 540, label: "540p"}, {width: 640, height: 360, label: "360p"}];
+
+    // 實際擷取到某解析度的第一幀才為它建 GIF 實例（lazy init），並快取在 window.gifList 供之後重用
+    // 原本啟動就預建 4 個實例 × 4 workers = 16 個 workers；實際每次只用一個解析度
+    // 需要 window.gifWorkerBlob 已載入（由 script.onload 的 fetch 填入）
+    function getOrCreateGif(width, height) {
+        if (window.gifList && window.gifList.has(width)) return window.gifList.get(width);
+        if (!window.gifWorkerBlob || !window.gifList) return null;
+        if (!videoResolutions.some(r => r.width === width)) return null;
+
+        const gif = new GIF({
+            workers: 4,
+            workerScript: URL.createObjectURL(window.gifWorkerBlob),
+            quality: 0,
+            repeat: 0,
+            width,
+            height,
+            background: '#ffffff'
+        });
+
+        gif.on('finished', function (blob) {
+            const gifUrl = URL.createObjectURL(blob);
+            const displayStartTime = formatTime(startTime * 1000);
+            const displayEndTime = formatTime(endTime * 1000);
+            const titleMatch = document.title.match(/(.+?\[\d+\])/);
+            const fileName = titleMatch
+                ? titleMatch[0] + ' ' + displayStartTime + '-' + displayEndTime
+                : displayStartTime + '-' + displayEndTime;
+
+            // data-object-url 讓刪除卡片時可以 revokeObjectURL，避免 blob 在 session 內累積
+            const cardHTML = `
+                <div class="card" data-object-url="${gifUrl}">
+                    <div class="image_container">
+                        <img class="image" src="${gifUrl}" alt="Image Description" />
+                    </div>
+                    <div class="title">
+                         <span>${displayStartTime} - ${displayEndTime}</span>
+                     </div>
+                    <a href="${gifUrl}" download="${fileName}">
+                        <button class="cart-button">
+                             <span>下載</span>
+                        </button>
+                    </a>
+                    <a id="delete-a">
+                    <button class="cart-button"">
+                        <span>刪除</span>
+                    </button>
+                    </a>
+                </div>
+            `;
+
+            imgsContainer.insertAdjacentHTML('beforeend', cardHTML);
+
+            gif.abort();
+            gif.frames = [];
+            gifRenderingInProgress = false;
+            if (imgsContainer.querySelectorAll('.card').length >= 3) {
+                imgsContainer.classList.add('image-container-override');
+                imgsContainer.scrollLeft = imgsContainer.scrollWidth;
+            }
+        });
+
+        gif.on('progress', function (progress) {
+            progressElement.style.width = `${Math.round(progress * 100)}%`;
+            percentage.textContent = `${Math.round(progress * 100)}%`;
+        });
+
+        window.gifList.set(width, gif);
+        return gif;
+    }
 
     const video = document.getElementById('ani_video_html5_api');
     let videoDuration = 1420;
@@ -986,75 +1058,18 @@
                 };
             }
 
-            let gifLoading = fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
+            // 只先載 worker blob；GIF 實例改由 getOrCreateGif 在真正擷取時 lazy 建立
+            fetch('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js')
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error("Network response was not OK");
                     }
-                    window.workerBlob = response.blob();
-                    return window.workerBlob;
-                }).then(workerBlob => {
-                    for (let i = 0; i < 4; i++) {
-                        let gif = new GIF({
-                            workers: 4,
-                            workerScript: URL.createObjectURL(workerBlob),
-                            quality: 0,
-                            repeat: 0,
-                            width: videoResolutions[i].width,
-                            height: videoResolutions[i].height,
-                            background: '#ffffff'
-                        });
-                        gif.on('finished', function (blob) {
-                            const gifUrl = URL.createObjectURL(blob);
-                            let displayStartTime = formatTime(startTime * 1000);
-                            let displayEndTime = formatTime(endTime * 1000);
-
-                            let fileName = document.title.match(/(.+?\[\d+\])/);
-                            if (fileName) {
-                                fileName = fileName[0] + ' ' + displayStartTime + '-' + displayEndTime;
-                            } else {
-                                fileName = displayStartTime + '-' + displayEndTime;
-                            }
-
-                            const cardHTML = `
-                                <div class="card">
-                                    <div class="image_container">
-                                        <img class="image" src="${gifUrl}" alt="Image Description" />
-                                    </div>
-                                    <div class="title">
-                                         <span>${displayStartTime} - ${displayEndTime}</span>
-                                     </div>
-                                    <a href="${gifUrl}" download="${fileName}">
-                                        <button class="cart-button">
-                                             <span>下載</span>
-                                        </button>
-                                    </a>
-                                    <a id="delete-a">
-                                    <button class="cart-button"">
-                                        <span>刪除</span>
-                                    </button>
-                                    </a>
-                                </div>
-                            `;
-
-                            imgsContainer.innerHTML += cardHTML;
-
-                            window.gifList.get(videoResolutions[i].width).abort();
-                            window.gifList.get(videoResolutions[i].width).frames = [];
-                            gifRenderingInProgress = false;
-                            if (imgsContainer.querySelectorAll('.card').length >= 3) {
-                                imgsContainer.classList.add('image-container-override');
-                                imgsContainer.scrollLeft = imgsContainer.scrollWidth;
-                            }
-                        });
-                        gif.on('progress', function (progress) {
-                            progressElement.style.width = `${Math.round(progress * 100)}%`; // 直接同步進度條
-                            percentage.textContent = `${Math.round(progress * 100)}%`; // 更新百分比顯示
-                        });
-                        window.gifList.set(videoResolutions[i].width, gif);
-                    }
-
-                }).catch(error => {
+                    return response.blob();
+                })
+                .then(workerBlob => {
+                    window.gifWorkerBlob = workerBlob;
+                })
+                .catch(error => {
                     console.error("Error loading GIF worker:", error);
                     showToast('GIF 元件載入失敗，請稍後再試', 'error', 2200);
                 });
@@ -1077,7 +1092,7 @@
             showToast('找不到影片播放器，無法擷取', 'error', 2200);
             return;
         }
-        if (!window.gifList || !window.gifList.size) {
+        if (!window.gifWorkerBlob) {
             showToast('GIF 元件尚未準備完成，請稍候', 'warning', 2200);
             return;
         }
@@ -1112,7 +1127,7 @@
             // 更新上一幀的 expectedDisplayTime
             lastExpectedDisplayTime = currentExpectedDisplayTime;
 
-            const gifInstance = window.gifList.get(canvas.width);
+            const gifInstance = getOrCreateGif(canvas.width, canvas.height);
             if (!gifInstance) {
                 isParsing = false;
                 video.muted = false;
