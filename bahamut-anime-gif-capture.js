@@ -248,15 +248,15 @@
 
         .range-input {
             position: relative;
-            height: 22px;
-            margin-top: -17px;
+            height: 18px;
+            margin-top: -14px;
             z-index: 1;
         }
 
         .range-input input {
             position: absolute;
             width: 100%;
-            height: 22px;
+            height: 18px;
             top: 0;
             left: 0;
             background: none;
@@ -267,8 +267,8 @@
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 22px;
-            width: 22px;
+            height: 18px;
+            width: 18px;
             border-radius: 50%;
             background: #fff;
             border: 2px solid #000;
@@ -294,8 +294,8 @@
         }
 
         input[type="range"]::-moz-range-thumb {
-            height: 22px;
-            width: 22px;
+            height: 18px;
+            width: 18px;
             border-radius: 50%;
             background: #fff;
             border: 2px solid #000;
