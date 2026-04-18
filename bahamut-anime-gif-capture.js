@@ -248,15 +248,15 @@
 
         .range-input {
             position: relative;
-            height: 18px;
-            margin-top: -14px;
+            height: 22px;
+            margin-top: -16px;
             z-index: 1;
         }
 
         .range-input input {
             position: absolute;
             width: 100%;
-            height: 18px;
+            height: 22px;
             top: 0;
             left: 0;
             background: none;
@@ -267,9 +267,9 @@
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 18px;
-            width: 18px;
-            border-radius: 50%;
+            height: 22px;
+            width: 6px;
+            border-radius: 2px;
             background: #fff;
             border: 2px solid #000;
             box-shadow: 2px 2px 0 0 #000;
@@ -279,12 +279,12 @@
         }
 
         input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.12);
+            transform: scaleY(1.15) scaleX(1.4);
         }
 
         input[type="range"]::-webkit-slider-thumb:active {
             cursor: grabbing;
-            transform: scale(1.05) translate(1px, 1px);
+            transform: scaleY(1.1) scaleX(1.3) translate(1px, 1px);
             box-shadow: 1px 1px 0 0 #000;
         }
 
@@ -294,9 +294,9 @@
         }
 
         input[type="range"]::-moz-range-thumb {
-            height: 18px;
-            width: 18px;
-            border-radius: 50%;
+            height: 22px;
+            width: 6px;
+            border-radius: 2px;
             background: #fff;
             border: 2px solid #000;
             box-shadow: 2px 2px 0 0 #000;
@@ -307,12 +307,12 @@
         }
 
         input[type="range"]::-moz-range-thumb:hover {
-            transform: scale(1.12);
+            transform: scaleY(1.15) scaleX(1.4);
         }
 
         input[type="range"]::-moz-range-thumb:active {
             cursor: grabbing;
-            transform: scale(1.05) translate(1px, 1px);
+            transform: scaleY(1.1) scaleX(1.3) translate(1px, 1px);
             box-shadow: 1px 1px 0 0 #000;
         }
 
