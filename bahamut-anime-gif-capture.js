@@ -544,13 +544,20 @@
             white-space: nowrap;
         }
 
+        .selects-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
         .resolution-select-row,
         .fps-select-row {
             display: flex;
             align-items: center;
-            justify-content: flex-end;
             gap: 10px;
-            margin-top: 10px;
         }
 
         .resolution-select,
@@ -705,24 +712,26 @@
                         <input type="range" class="range-min" min="0" max="1420000" value="0" step="100">
                         <input type="range" class="range-max" min="0" max="1420000" value="15000" step="100">
                     </div>
-                    <div class="resolution-select-row">
-                        <label for="resolutionSelect">輸出解析度：</label>
-                        <select id="resolutionSelect" class="flip-card__input resolution-select">
-                            <option value="">原始（跟隨來源）</option>
-                            <option value="1920">1080p</option>
-                            <option value="1280">720p</option>
-                            <option value="960">540p</option>
-                            <option value="640">360p</option>
-                        </select>
-                    </div>
-                    <div class="fps-select-row">
-                        <label for="fpsSelect">幀率：</label>
-                        <select id="fpsSelect" class="flip-card__input fps-select">
-                            <option value="">原生（跟隨來源）</option>
-                            <option value="12">12 fps</option>
-                            <option value="8">8 fps</option>
-                            <option value="5">5 fps</option>
-                        </select>
+                    <div class="selects-row">
+                        <div class="resolution-select-row">
+                            <label for="resolutionSelect">輸出解析度：</label>
+                            <select id="resolutionSelect" class="flip-card__input resolution-select">
+                                <option value="">原始（跟隨來源）</option>
+                                <option value="1920">1080p</option>
+                                <option value="1280">720p</option>
+                                <option value="960">540p</option>
+                                <option value="640">360p</option>
+                            </select>
+                        </div>
+                        <div class="fps-select-row">
+                            <label for="fpsSelect">幀率：</label>
+                            <select id="fpsSelect" class="flip-card__input fps-select">
+                                <option value="">原生（跟隨來源）</option>
+                                <option value="12">12 fps</option>
+                                <option value="8">8 fps</option>
+                                <option value="5">5 fps</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="control-btn">
                         <button type="button" class="flip-card__btn flip-card__btn--primary" id="generateButton">生成</button>
