@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.6
+// @version      1.7
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -847,7 +847,11 @@
         }
 
         if (event.key === 'Escape') {
-            closePopup();
+            if (isParsing) {
+                cancelCapture();
+            } else {
+                closePopup();
+            }
         }
     }
 
@@ -1096,6 +1100,7 @@
     let lastExpectedDisplayTime = null;
     let frameDisplayDurations = [];
     let currentWidth = 1920;
+    let preCaptureCurrentTime = null; // 擷取開始時的播放位置，取消時用來 seek 回去
 
     function captureFrames() {
         if (!video) {
@@ -1107,6 +1112,7 @@
             return;
         }
         isParsing = true;
+        preCaptureCurrentTime = video.currentTime;
 
         // 這個回調將每一幀都調用
         function frameCallback(now, metadata) {
@@ -1226,7 +1232,11 @@
     function cancelCapture() {
         if (!isParsing) return;
         isParsing = false;
-        if (video) video.muted = false;
+        if (video) {
+            video.muted = false;
+            // 把播放位置拉回使用者按「生成」當下的時間；不然 video 會停在擷取結束的位置
+            if (preCaptureCurrentTime !== null) video.currentTime = preCaptureCurrentTime;
+        }
         // 清掉已累積但尚未 render 的影格（lazy init 可能還沒建 gif 實例，故需判空）
         const gifInstance = window.gifList && window.gifList.get(currentWidth);
         if (gifInstance && gifInstance.frames) gifInstance.frames = [];
