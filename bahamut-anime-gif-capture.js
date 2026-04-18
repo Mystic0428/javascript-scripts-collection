@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.5
+// @version      1.6
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -762,12 +762,18 @@
 
     document.body.insertAdjacentHTML('beforeend', popupHTML);
 
+    const generateButton = document.getElementById('generateButton');
+
     // 關閉按鈕事件
     document.getElementById('closePopupBtn').addEventListener('click', closePopup);
 
-    // 設置生成按鈕的事件監聽器
-    document.getElementById('generateButton').addEventListener('click', function () {
-        if (gifRenderingInProgress || isParsing) {
+    // 設置生成按鈕的事件監聽器（擷取中再按會變成取消）
+    generateButton.addEventListener('click', function () {
+        if (isParsing) {
+            cancelCapture();
+            return;
+        }
+        if (gifRenderingInProgress) {
             showToast('正在處理中，請稍候', 'warning');
             return;
         }
@@ -784,6 +790,10 @@
         video.muted = true;
         video.play();
         captureFrames();
+        // captureFrames 若因條件不足（無 video／gifWorkerBlob 尚未載完）早退就不會 set isParsing
+        if (isParsing) {
+            generateButton.textContent = '取消';
+        }
     });
 
     const popup = document.getElementById('popup');
@@ -1100,6 +1110,8 @@
 
         // 這個回調將每一幀都調用
         function frameCallback(now, metadata) {
+            // 使用者按取消 → cancelCapture 會把 isParsing 設為 false，這裡直接跳出不再排下一幀
+            if (!isParsing) return;
             // 確保捕捉只在設定的開始時間之後觸發
             if (video.currentTime < startTime) {
                 //如果影片尚未達到開始捕捉的時間，則繼續等待
@@ -1131,6 +1143,7 @@
             if (!gifInstance) {
                 isParsing = false;
                 video.muted = false;
+                generateButton.textContent = '生成';
                 showToast(`目前不支援 ${canvas.width}px 解析度的 GIF 產生`, 'error', 2400);
                 return;
             }
@@ -1178,6 +1191,7 @@
             if (video) {
                 video.muted = false;
             }
+            generateButton.textContent = '生成';
             showToast('GIF 產生器不存在，請重新整理頁面', 'error', 2200);
             return;
         }
@@ -1188,6 +1202,7 @@
             if (video) {
                 video.muted = false;
             }
+            generateButton.textContent = '生成';
             showToast('沒有可用影格，無法產生 GIF', 'warning', 2200);
             return;
         }
@@ -1196,6 +1211,7 @@
         const averageFrameDisplayDuration = frameDisplayDurations.reduce((total, duration) => total + duration, 0) / frameDisplayDurations.length;
         video.muted = false;
         isParsing = false;
+        generateButton.textContent = '生成';
         for (let i = 0; i < gifInstance.frames.length; i++) {
             gifInstance.frames[i].delay = averageFrameDisplayDuration;
         }
@@ -1205,6 +1221,20 @@
         gifRenderingInProgress = true;
         frameDisplayDurations = [];
         lastExpectedDisplayTime = null;
+    }
+
+    function cancelCapture() {
+        if (!isParsing) return;
+        isParsing = false;
+        if (video) video.muted = false;
+        // 清掉已累積但尚未 render 的影格（lazy init 可能還沒建 gif 實例，故需判空）
+        const gifInstance = window.gifList && window.gifList.get(currentWidth);
+        if (gifInstance && gifInstance.frames) gifInstance.frames = [];
+        frameDisplayDurations = [];
+        lastExpectedDisplayTime = null;
+        resetProgress();
+        generateButton.textContent = '生成';
+        showToast('已取消擷取', 'warning', 1500);
     }
 
     // ========= 截圖功能相關 =========
