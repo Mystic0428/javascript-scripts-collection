@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.11
+// @version      1.12
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -194,10 +194,13 @@
         }
 
         .slider {
-            height: 5px;
+            height: 6px;
             position: relative;
-            background: #ddd;
-            border-radius: 5px;
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 6px;
+            box-shadow: 3px 3px 0 0 #000;
+            margin-top: 4px;
         }
 
         .slider .progress {
@@ -205,20 +208,57 @@
             left: 25%;
             right: 25%;
             position: absolute;
-            border-radius: 5px;
             background: #17a2b8;
+        }
+
+        .slider-tooltip {
+            position: absolute;
+            bottom: calc(100% + 14px);
+            left: 0;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 0 0 #000;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 150ms ease-out;
+            z-index: 2;
+        }
+
+        .slider-tooltip.is-visible {
+            opacity: 1;
+        }
+
+        .slider-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #000;
         }
 
         .range-input {
             position: relative;
+            height: 22px;
+            margin-top: -16px;
+            z-index: 1;
         }
 
         .range-input input {
             position: absolute;
             width: 100%;
-            height: 5px;
-            top: -6px;
-            left: -2px;
+            height: 22px;
+            top: 0;
+            left: 0;
             background: none;
             pointer-events: none;
             -webkit-appearance: none;
@@ -226,24 +266,73 @@
         }
 
         input[type="range"]::-webkit-slider-thumb {
-            height: 17px;
-            width: 5px;
-            border-radius: 80%;
-            background: #17a2b8;
-            pointer-events: auto;
             -webkit-appearance: none;
-            box-shadow: 0 0 6px rgba(0, 0, 0, 0.05);
+            height: 22px;
+            width: 6px;
+            border-radius: 2px;
+            background: #fff;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 0 0 #000;
+            pointer-events: auto;
+            cursor: grab;
+            transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scaleY(1.15) scaleX(1.4);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scaleY(1.1) scaleX(1.3) translate(1px, 1px);
+            box-shadow: 1px 1px 0 0 #000;
+        }
+
+        input[type="range"]:focus-visible::-webkit-slider-thumb {
+            outline: 3px solid #17a2b8;
+            outline-offset: 2px;
         }
 
         input[type="range"]::-moz-range-thumb {
-            height: 17px;
-            width: 17px;
-            border: none;
-            border-radius: 50%;
-            background: #17a2b8;
-            pointer-events: auto;
+            height: 22px;
+            width: 6px;
+            border-radius: 2px;
+            background: #fff;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 0 0 #000;
             -moz-appearance: none;
-            box-shadow: 0 0 6px rgba(0, 0, 0, 0.05);
+            pointer-events: auto;
+            cursor: grab;
+            transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scaleY(1.15) scaleX(1.4);
+        }
+
+        input[type="range"]::-moz-range-thumb:active {
+            cursor: grabbing;
+            transform: scaleY(1.1) scaleX(1.3) translate(1px, 1px);
+            box-shadow: 1px 1px 0 0 #000;
+        }
+
+        input[type="range"]:focus-visible::-moz-range-thumb {
+            outline: 3px solid #17a2b8;
+            outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .slider-tooltip,
+            input[type="range"]::-webkit-slider-thumb,
+            input[type="range"]::-moz-range-thumb {
+                transition: none;
+            }
+            input[type="range"]::-webkit-slider-thumb:hover,
+            input[type="range"]::-webkit-slider-thumb:active,
+            input[type="range"]::-moz-range-thumb:hover,
+            input[type="range"]::-moz-range-thumb:active {
+                transform: none;
+            }
         }
 
         .d-flex {
@@ -254,6 +343,8 @@
             margin: 20px 0 0;
             display: flex;
             justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .card {
@@ -587,6 +678,8 @@
                     </div>
                     <div class="slider">
                         <div class="progress" style="left: 0%; right: 98.6437%;"></div>
+                        <div class="slider-tooltip" id="sliderTooltipMin" style="left: 0%;">00:00:00:000</div>
+                        <div class="slider-tooltip" id="sliderTooltipMax" style="left: 100%;">00:00:15:000</div>
                     </div>
                     <div class="range-input">
                         <input type="range" class="range-min" min="0" max="1420000" value="0" step="100">
@@ -605,6 +698,7 @@
                     <div class="control-btn">
                         <button type="button" class="flip-card__btn" id="generateButton">生成</button>
                         <button type="button" class="flip-card__btn" id="reset-btn">重置</button>
+                        <button type="button" class="flip-card__btn" id="syncToCurrentBtn" title="把範圍起點設成目前影片時間">跳到目前時間</button>
                     </div>
                 </div>
             </div>
@@ -631,6 +725,8 @@
     const resolutionProgressElement = document.getElementById('resolutionProgress');
     const resolutionPercentage = document.getElementById('resolutionPercentage');
     const resolutionSelect = document.getElementById('resolutionSelect');
+    const sliderTooltipMin = document.getElementById('sliderTooltipMin');
+    const sliderTooltipMax = document.getElementById('sliderTooltipMax');
     const video = document.getElementById('ani_video_html5_api');
     // 下列 refs 等 window.onload 才 querySelector 填入（同時補 range input 的 max、綁事件）
     let rangeInput, timeInput, range, imgsContainer, resetButton;
@@ -722,6 +818,22 @@
         }
         range.style.left = leftPercentage + "%";
         range.style.right = rightPercentage + "%";
+
+        if (sliderTooltipMin && sliderTooltipMax && rangeInput && rangeInput.length) {
+            sliderTooltipMin.style.left = (rangeInput1 * 100) + "%";
+            sliderTooltipMax.style.left = (rangeInput2 * 100) + "%";
+            sliderTooltipMin.textContent = formatTime(rangeInput[0].value);
+            sliderTooltipMax.textContent = formatTime(rangeInput[1].value);
+
+            // min thumb 跨過一半就上提，避免被右邊的 max thumb 蓋住抓不到
+            if (rangeInput1 > 0.5) {
+                rangeInput[0].style.zIndex = '2';
+                rangeInput[1].style.zIndex = '1';
+            } else {
+                rangeInput[0].style.zIndex = '1';
+                rangeInput[1].style.zIndex = '2';
+            }
+        }
     }
 
     function handleTimeChange(e) {
@@ -1346,6 +1458,24 @@
             });
         });
 
+        rangeInput.forEach((input, idx) => {
+            const tooltip = idx === 0 ? sliderTooltipMin : sliderTooltipMax;
+            if (!tooltip) return;
+            const show = () => {
+                tooltip.classList.add('is-visible');
+                // LIFO：剛被碰的 thumb 提到上層，連續拖不會被對邊搶走
+                rangeInput[idx].style.zIndex = '3';
+                rangeInput[1 - idx].style.zIndex = '1';
+            };
+            const hide = () => tooltip.classList.remove('is-visible');
+            input.addEventListener('pointerdown', show);
+            input.addEventListener('pointerup', hide);
+            input.addEventListener('pointercancel', hide);
+            input.addEventListener('lostpointercapture', hide);
+            input.addEventListener('focus', show);
+            input.addEventListener('blur', hide);
+        });
+
         imgsContainer.addEventListener('click', (e) => {
             if (e.target.closest('#delete-a')) {
                 const card = e.target.closest('.card');
@@ -1364,6 +1494,14 @@
         resetButton.addEventListener('click', (e) => {
             resetTime();
         });
+
+        const syncToCurrentBtn = document.getElementById('syncToCurrentBtn');
+        if (syncToCurrentBtn) {
+            syncToCurrentBtn.addEventListener('click', () => {
+                if (isParsing || gifRenderingInProgress) return;
+                syncTimeRangeToCurrentPlayback();
+            });
+        }
 
     };
 
