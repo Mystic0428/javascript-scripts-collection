@@ -321,6 +321,14 @@
             outline-offset: 2px;
         }
 
+        input[type="range"].range-max::-webkit-slider-thumb {
+            background: #000;
+        }
+
+        input[type="range"].range-max::-moz-range-thumb {
+            background: #000;
+        }
+
         @media (prefers-reduced-motion: reduce) {
             .slider-tooltip,
             input[type="range"]::-webkit-slider-thumb,
@@ -821,6 +829,15 @@
             sliderTooltipMax.style.left = (rangeInput2 * 100) + "%";
             sliderTooltipMin.textContent = formatTime(rangeInput[0].value);
             sliderTooltipMax.textContent = formatTime(rangeInput[1].value);
+
+            // min thumb 跨過一半就上提，避免被右邊的 max thumb 蓋住抓不到
+            if (rangeInput1 > 0.5) {
+                rangeInput[0].style.zIndex = '2';
+                rangeInput[1].style.zIndex = '1';
+            } else {
+                rangeInput[0].style.zIndex = '1';
+                rangeInput[1].style.zIndex = '2';
+            }
         }
     }
 
@@ -1449,7 +1466,12 @@
         rangeInput.forEach((input, idx) => {
             const tooltip = idx === 0 ? sliderTooltipMin : sliderTooltipMax;
             if (!tooltip) return;
-            const show = () => tooltip.classList.add('is-visible');
+            const show = () => {
+                tooltip.classList.add('is-visible');
+                // LIFO：剛被碰的 thumb 提到上層，連續拖不會被對邊搶走
+                rangeInput[idx].style.zIndex = '3';
+                rangeInput[1 - idx].style.zIndex = '1';
+            };
             const hide = () => tooltip.classList.remove('is-visible');
             input.addEventListener('pointerdown', show);
             input.addEventListener('pointerup', hide);
