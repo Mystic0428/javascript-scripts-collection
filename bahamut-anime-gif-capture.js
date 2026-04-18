@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         巴哈姆特動畫瘋GIF截圖工具
 // @namespace    巴哈:aa24281024/GitHub:Mystic0428
-// @version      1.10
+// @version      1.11
 // @description  把動畫瘋內容片段轉成GIF與截圖功能
 // @author       巴哈:aa24281024(Mystic)/GitHub:Mystic0428
 // @match        https://ani.gamer.com.tw/animeVideo.php?sn=*
@@ -41,14 +41,18 @@
 
         .flip-card__popup {
             width: 1200px;
+            max-width: 95vw;
             height: auto;
+            max-height: 95vh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
             padding: 20px;
             display: none;
             position: fixed;
             left: 50%;
             top: 50%;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             background: lightgrey;
             gap: 20px;
             border-radius: 5px;
@@ -56,7 +60,7 @@
             box-shadow: 4px 4px var(--main-color);
             backface-visibility: hidden;
             transform: translate(-50%, -50%);
-            z-index:100;
+            z-index: 9999;
         }
 
         .flip-card__form {
