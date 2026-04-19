@@ -22,6 +22,36 @@
     };
 
     const STYLE_ID = 'pus-style';
+    const STORAGE_KEY = 'ptt-ui-style:v1';
+
+    // ==================== 儲存 ====================
+    function load() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return { ...DEFAULTS };
+        try {
+            const parsed = JSON.parse(raw);
+            const clean = { ...DEFAULTS };
+            for (const k of Object.keys(DEFAULTS)) {
+                if (typeof parsed[k] === typeof DEFAULTS[k]) {
+                    clean[k] = parsed[k];
+                }
+            }
+            return clean;
+        } catch (e) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULTS }));
+            } catch (_) { /* recovery write best-effort */ }
+            return { ...DEFAULTS };
+        }
+    }
+
+    function save(state) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+            alert('儲存失敗，可能是瀏覽器儲存空間已滿');
+        }
+    }
 
     // ==================== 樣式套用 ====================
     function buildCss(state) {
@@ -48,5 +78,6 @@
     }
 
     // ==================== 初始化 ====================
-    apply(DEFAULTS);
+    const state = load();
+    apply(state);
 })();
