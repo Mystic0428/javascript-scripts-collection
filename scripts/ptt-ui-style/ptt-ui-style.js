@@ -198,12 +198,38 @@
         return btn;
     }
 
+    function buildColorField(labelText, key) {
+        const row = document.createElement('div');
+        row.className = 'pus-field';
+
+        const label = document.createElement('label');
+        label.textContent = labelText;
+
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = state[key];
+        input.addEventListener('input', () => {
+            state[key] = input.value;
+            save(state);
+            apply(state);
+        });
+
+        fields[key] = input;
+        row.appendChild(label);
+        row.appendChild(input);
+        return row;
+    }
+
     function buildPanel() {
         const panel = document.createElement('div');
         panel.className = 'pus-panel';
         panel.style.display = 'none';
         panel.addEventListener('click', (e) => e.stopPropagation());
-        // 欄位由 Task 5-8 逐步塞入
+
+        panel.appendChild(buildColorField('主要底色', 'bodyBg'));
+        panel.appendChild(buildColorField('白字顏色（.q7）', 'colorQ7'));
+        panel.appendChild(buildColorField('黃字顏色（.q3）', 'colorQ3'));
+
         return panel;
     }
 
