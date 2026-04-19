@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PTT UI Style
 // @namespace    GitHub:Mystic0428
-// @version      1.0.0
+// @version      1.1.0
 // @description  自訂 PTT 網頁版（term.ptt.cc）的配色與背景圖
 // @author       GitHub:Mystic0428
 // @match        https://term.ptt.cc/*
