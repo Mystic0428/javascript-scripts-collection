@@ -12,9 +12,14 @@
 |------|------|------|
 | [巴哈姆特動畫瘋 GIF 擷取工具](./scripts/bahamut-anime-gif-capture/) | 在動畫瘋把影片片段做成 GIF、支援解析度／幀率調整、即時截圖 | Tampermonkey Userscript |
 
+### 瀏覽器工具
+
+| 名稱 | 說明 | 類型 |
+|------|------|------|
+| [PTT UI Style](./scripts/ptt-ui-style/) | 自訂 PTT 網頁版（term.ptt.cc）的配色與背景圖 | Tampermonkey Userscript |
+
 <!-- 未來新增的分類範例：
 
-### 瀏覽器工具
 ### 開發輔助
 ### 資料處理
 
