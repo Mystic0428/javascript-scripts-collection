@@ -13,16 +13,40 @@
 (function () {
     'use strict';
 
-    const style = document.createElement('style');
-    style.textContent = `
-        .q7 { color: #fff; }
-        .q3 { color: #fdff00; }
-        #easyReadingLastRow,
-        #easyReadingReplyRow,
-        .main {
-            background: url(https://i.imgur.com/s1tMBrr.jpg) center / 100% no-repeat;
+    // ==================== 預設值 ====================
+    const DEFAULTS = {
+        bodyBg:   '#46525e',
+        colorQ7:  '#ffffff',
+        colorQ3:  '#fdff00',
+        imageSrc: 'https://i.imgur.com/s1tMBrr.jpg',
+    };
+
+    const STYLE_ID = 'pus-style';
+
+    // ==================== 樣式套用 ====================
+    function buildCss(state) {
+        return `
+            .q7 { color: ${state.colorQ7}; }
+            .q3 { color: ${state.colorQ3}; }
+            #easyReadingLastRow,
+            #easyReadingReplyRow,
+            .main {
+                background: url(${state.imageSrc}) center / 100% no-repeat;
+            }
+            body { background-color: ${state.bodyBg}; }
+        `;
+    }
+
+    function apply(state) {
+        let style = document.getElementById(STYLE_ID);
+        if (!style) {
+            style = document.createElement('style');
+            style.id = STYLE_ID;
+            document.head.appendChild(style);
         }
-        body { background-color: #46525e; }
-    `;
-    document.head.appendChild(style);
+        style.textContent = buildCss(state);
+    }
+
+    // ==================== 初始化 ====================
+    apply(DEFAULTS);
 })();
