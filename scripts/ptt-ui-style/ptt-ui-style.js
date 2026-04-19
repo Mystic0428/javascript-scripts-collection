@@ -62,13 +62,14 @@
 
     // ==================== 樣式套用 ====================
     function buildCss(state) {
+        const img = state.imageSrc.replace(/["\\]/g, '\\$&');
         return `
             .q7 { color: ${state.colorQ7}; }
             .q3 { color: ${state.colorQ3}; }
             #easyReadingLastRow,
             #easyReadingReplyRow,
             .main {
-                background: url(${state.imageSrc}) center / 100% no-repeat;
+                background: url("${img}") center / 100% no-repeat;
             }
             body { background-color: ${state.bodyBg}; }
         `;
@@ -220,6 +221,28 @@
         return row;
     }
 
+    function buildUrlField() {
+        const row = document.createElement('div');
+        row.className = 'pus-field pus-field-stacked';
+
+        const label = document.createElement('label');
+        label.textContent = '背景圖 URL';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = state.imageSrc;
+        input.addEventListener('input', () => {
+            state.imageSrc = input.value;
+            save(state);
+            apply(state);
+        });
+
+        fields.imageSrc = input;
+        row.appendChild(label);
+        row.appendChild(input);
+        return row;
+    }
+
     function buildPanel() {
         const panel = document.createElement('div');
         panel.className = 'pus-panel';
@@ -229,6 +252,7 @@
         panel.appendChild(buildColorField('主要底色', 'bodyBg'));
         panel.appendChild(buildColorField('白字顏色（.q7）', 'colorQ7'));
         panel.appendChild(buildColorField('黃字顏色（.q3）', 'colorQ3'));
+        panel.appendChild(buildUrlField());
 
         return panel;
     }
