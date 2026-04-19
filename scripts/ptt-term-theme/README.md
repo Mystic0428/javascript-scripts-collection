@@ -1,6 +1,6 @@
-# PTT UI Style
+# PTT Term Theme
 
-自訂 PTT 網頁版（`term.ptt.cc`）的配色與背景圖片。
+自訂 PTT 終端機（`term.ptt.cc`）的配色與背景圖片。
 
 > Tampermonkey 腳本，只在 `https://term.ptt.cc/*` 生效。
 
@@ -26,7 +26,7 @@
 | 背景圖 URL | 主畫面背景圖，可貼 http(s) 網址或按 **本地上傳** 選一張本地圖片 |
 | 恢復預設 | 一鍵回到出廠配色與背景圖（會先確認） |
 
-所有改動**即時套用**並自動存入瀏覽器 `localStorage`（key：`ptt-ui-style:v1`），重新整理或關瀏覽器後仍保留。
+所有改動**即時套用**並自動存入瀏覽器 `localStorage`（key：`ptt-term-theme:v1`），重新整理或關瀏覽器後仍保留。
 
 本地上傳的圖片會轉 base64 存進 `localStorage`：
 - 小於 2MB：直接使用
@@ -38,7 +38,7 @@
 ## 安裝
 
 1. 瀏覽器安裝 [Tampermonkey](https://www.tampermonkey.net/) 擴充功能
-2. Tampermonkey → 新增腳本，把 `ptt-ui-style.js` 整份內容貼上並儲存
+2. Tampermonkey → 新增腳本，把 `ptt-term-theme.js` 整份內容貼上並儲存
 3. 打開 <https://term.ptt.cc/> 即可看到新樣式
 
 ---

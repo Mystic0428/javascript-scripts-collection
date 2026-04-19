@@ -16,7 +16,7 @@
 
 | 名稱 | 說明 | 類型 |
 |------|------|------|
-| [PTT UI Style](./scripts/ptt-ui-style/) | 自訂 PTT 網頁版（term.ptt.cc）的配色與背景圖 | Tampermonkey Userscript |
+| [PTT Term Theme](./scripts/ptt-term-theme/) | 自訂 PTT 終端機（term.ptt.cc）的配色與背景圖 | Tampermonkey Userscript |
 
 <!-- 未來新增的分類範例：
 

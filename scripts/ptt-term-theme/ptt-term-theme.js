@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         PTT UI Style
+// @name         PTT Term Theme
 // @namespace    GitHub:Mystic0428
-// @version      1.1.0
-// @description  自訂 PTT 網頁版（term.ptt.cc）的配色與背景圖
+// @version      1.2.0
+// @description  自訂 PTT 終端機（term.ptt.cc）的配色與背景圖
 // @author       GitHub:Mystic0428
 // @match        https://term.ptt.cc/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=ptt.cc
@@ -21,9 +21,9 @@
         imageSrc: 'https://i.imgur.com/s1tMBrr.jpg',
     };
 
-    const STYLE_ID = 'pus-style';
-    const STORAGE_KEY = 'ptt-ui-style:v1';
-    const PANEL_STYLE_ID = 'pus-panel-style';
+    const STYLE_ID = 'ptm-style';
+    const STORAGE_KEY = 'ptt-term-theme:v1';
+    const PANEL_STYLE_ID = 'ptm-panel-style';
 
     // ==================== 模組狀態 ====================
     let state;
@@ -91,7 +91,7 @@
         const s = document.createElement('style');
         s.id = PANEL_STYLE_ID;
         s.textContent = `
-            .pus-gear {
+            .ptm-gear {
                 position: fixed;
                 top: 12px;
                 right: 12px;
@@ -109,9 +109,9 @@
                 transition: opacity 0.2s;
                 z-index: 999999;
             }
-            .pus-gear:hover { opacity: 1; }
+            .ptm-gear:hover { opacity: 1; }
 
-            .pus-panel {
+            .ptm-panel {
                 position: fixed;
                 top: 48px;
                 right: 12px;
@@ -127,19 +127,19 @@
                 box-sizing: border-box;
             }
 
-            .pus-field {
+            .ptm-field {
                 margin-bottom: 10px;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 gap: 8px;
             }
-            .pus-field-stacked {
+            .ptm-field-stacked {
                 flex-direction: column;
                 align-items: stretch;
             }
-            .pus-field label { flex: 1; }
-            .pus-field input[type="color"] {
+            .ptm-field label { flex: 1; }
+            .ptm-field input[type="color"] {
                 width: 48px;
                 height: 26px;
                 border: none;
@@ -147,7 +147,7 @@
                 padding: 0;
                 cursor: pointer;
             }
-            .pus-field input[type="text"] {
+            .ptm-field input[type="text"] {
                 width: 100%;
                 margin-top: 4px;
                 padding: 4px 6px;
@@ -159,7 +159,7 @@
                 font-family: monospace;
                 font-size: 12px;
             }
-            .pus-upload-btn {
+            .ptm-upload-btn {
                 margin-top: 6px;
                 padding: 4px 8px;
                 background: #555;
@@ -169,8 +169,8 @@
                 cursor: pointer;
                 font-size: 12px;
             }
-            .pus-upload-btn:hover { background: #666; }
-            .pus-reset-btn {
+            .ptm-upload-btn:hover { background: #666; }
+            .ptm-reset-btn {
                 margin-top: 10px;
                 padding: 5px 10px;
                 background: transparent;
@@ -181,7 +181,7 @@
                 float: right;
                 font-size: 12px;
             }
-            .pus-reset-btn:hover { background: rgba(255,107,107,0.15); }
+            .ptm-reset-btn:hover { background: rgba(255,107,107,0.15); }
         `;
         document.head.appendChild(s);
     }
@@ -189,7 +189,7 @@
     function buildGear() {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'pus-gear';
+        btn.className = 'ptm-gear';
         btn.setAttribute('aria-label', '自訂外觀');
         btn.textContent = '⚙';
         btn.addEventListener('click', (e) => {
@@ -201,7 +201,7 @@
 
     function buildColorField(labelText, key) {
         const row = document.createElement('div');
-        row.className = 'pus-field';
+        row.className = 'ptm-field';
 
         const label = document.createElement('label');
         label.textContent = labelText;
@@ -223,7 +223,7 @@
 
     function buildUrlField() {
         const row = document.createElement('div');
-        row.className = 'pus-field pus-field-stacked';
+        row.className = 'ptm-field ptm-field-stacked';
 
         const label = document.createElement('label');
         label.textContent = '背景圖 URL';
@@ -240,7 +240,7 @@
 
         const uploadBtn = document.createElement('button');
         uploadBtn.type = 'button';
-        uploadBtn.className = 'pus-upload-btn';
+        uploadBtn.className = 'ptm-upload-btn';
         uploadBtn.textContent = '本地上傳';
 
         const fileInput = document.createElement('input');
@@ -287,7 +287,7 @@
     function buildResetButton() {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'pus-reset-btn';
+        btn.className = 'ptm-reset-btn';
         btn.textContent = '恢復預設';
         btn.addEventListener('click', () => {
             if (!confirm('確定要恢復預設樣式？')) return;
@@ -303,7 +303,7 @@
 
     function buildPanel() {
         const panel = document.createElement('div');
-        panel.className = 'pus-panel';
+        panel.className = 'ptm-panel';
         panel.style.display = 'none';
         panel.addEventListener('click', (e) => e.stopPropagation());
 
