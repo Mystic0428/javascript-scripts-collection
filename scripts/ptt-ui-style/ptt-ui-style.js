@@ -284,6 +284,23 @@
         return row;
     }
 
+    function buildResetButton() {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'pus-reset-btn';
+        btn.textContent = '恢復預設';
+        btn.addEventListener('click', () => {
+            if (!confirm('確定要恢復預設樣式？')) return;
+            localStorage.removeItem(STORAGE_KEY);
+            state = { ...DEFAULTS };
+            Object.entries(DEFAULTS).forEach(([k, v]) => {
+                if (fields[k]) fields[k].value = v;
+            });
+            apply(state);
+        });
+        return btn;
+    }
+
     function buildPanel() {
         const panel = document.createElement('div');
         panel.className = 'pus-panel';
@@ -294,6 +311,7 @@
         panel.appendChild(buildColorField('白字顏色（.q7）', 'colorQ7'));
         panel.appendChild(buildColorField('黃字顏色（.q3）', 'colorQ3'));
         panel.appendChild(buildUrlField());
+        panel.appendChild(buildResetButton());
 
         return panel;
     }
