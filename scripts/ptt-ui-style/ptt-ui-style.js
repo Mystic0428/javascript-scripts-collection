@@ -236,10 +236,51 @@
             save(state);
             apply(state);
         });
-
         fields.imageSrc = input;
+
+        const uploadBtn = document.createElement('button');
+        uploadBtn.type = 'button';
+        uploadBtn.className = 'pus-upload-btn';
+        uploadBtn.textContent = '本地上傳';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+
+        uploadBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+            const MB = 1024 * 1024;
+            if (file.size > 4 * MB) {
+                alert('圖片過大（> 4MB），請壓縮後再試');
+                fileInput.value = '';
+                return;
+            }
+            if (file.size > 2 * MB) {
+                alert('圖片較大，存檔可能受限');
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUri = reader.result;
+                input.value = dataUri;
+                state.imageSrc = dataUri;
+                save(state);
+                apply(state);
+            };
+            reader.onerror = () => {
+                alert('讀取檔案失敗，請重試');
+            };
+            reader.readAsDataURL(file);
+            fileInput.value = '';
+        });
+
         row.appendChild(label);
         row.appendChild(input);
+        row.appendChild(uploadBtn);
+        row.appendChild(fileInput);
         return row;
     }
 
